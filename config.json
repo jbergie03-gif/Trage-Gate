@@ -1,0 +1,147 @@
+{
+  "_README": "All Apex figures here are VERIFIED against Apex's own help-center pages (EOD Evaluations, EOD Payouts, Legacy 30% MAE, Prohibited Activities), pasted by Jonathan Aug 2026. Everything under my_rules{} is MY design, not Apex's, and is deliberately stricter than Apex requires: Apex's rules let you pass an evaluation, these rules are built to get you a payout. Apex prohibits automation, so this tool never places an order \u2014 it gates, sizes, and journals. You place every fill by hand.",
+  "active_account": "100K",
+  "instrument": "MES",
+  "phase": "PA",
+  "instruments": {
+    "MES": {
+      "tick_size": 0.25,
+      "tick_value": 1.25,
+      "point_value": 5.0,
+      "contract_ratio": 10,
+      "commission_round_trip": 1.24
+    },
+    "ES": {
+      "tick_size": 0.25,
+      "tick_value": 12.5,
+      "point_value": 50.0,
+      "contract_ratio": 1,
+      "commission_round_trip": 3.1
+    }
+  },
+  "accounts": {
+    "25K": {
+      "start_balance": 25000,
+      "eval_profit_target": 1500,
+      "eod_drawdown": 1000,
+      "daily_loss_limit": 500,
+      "max_contracts_es": 4,
+      "min_daily_profit": 100,
+      "safety_net_balance": 26100,
+      "min_balance_to_request": 26600,
+      "max_payouts_schedule": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    "50K": {
+      "start_balance": 50000,
+      "eval_profit_target": 3000,
+      "eod_drawdown": 2000,
+      "daily_loss_limit": 1000,
+      "max_contracts_es": 6,
+      "min_daily_profit": 250,
+      "safety_net_balance": 52100,
+      "min_balance_to_request": 52600,
+      "max_payouts_schedule": [
+        1500,
+        1500,
+        2000,
+        2500,
+        2500,
+        3000
+      ]
+    },
+    "100K": {
+      "start_balance": 100000,
+      "eval_profit_target": 6000,
+      "eod_drawdown": 3000,
+      "daily_loss_limit": 1500,
+      "max_contracts_es": 8,
+      "min_daily_profit": 300,
+      "safety_net_balance": 103100,
+      "min_balance_to_request": 103600,
+      "max_payouts_schedule": [
+        2000,
+        2500,
+        2500,
+        3000,
+        4000,
+        4000
+      ]
+    },
+    "150K": {
+      "start_balance": 150000,
+      "eval_profit_target": 9000,
+      "eod_drawdown": 4000,
+      "daily_loss_limit": 2000,
+      "max_contracts_es": 12,
+      "min_daily_profit": 350,
+      "safety_net_balance": 154100,
+      "min_balance_to_request": 154600,
+      "max_payouts_schedule": [
+        2500,
+        3000,
+        3000,
+        3000,
+        4000,
+        5000
+      ]
+    }
+  },
+  "payout": {
+    "_note": "VERIFIED from Apex's EOD Payouts page. Consistency is 50% (no single profitable day may be 50% or more of total profit since the last approved payout). 100% split, min $500 per request, max 6 payouts then the PA closes.",
+    "consistency_pct": 0.5,
+    "min_qualifying_days": 5,
+    "min_payout_amount": 500,
+    "max_payouts": 6,
+    "split": 1.0,
+    "verified": true
+  },
+  "mae": {
+    "_note": "REFERENCE ONLY, NOT ENFORCED. Apex's 30% Negative P&L (MAE) rule is titled 'Legacy', there is no EOD equivalent page, and the EOD payout rules never mention it \u2014 so it is treated as not applying to EOD accounts. Kept here because the per-trade risk cap in my_rules is far tighter than this ceiling would be anyway. Set enforce=true only if Apex support confirms it applies.",
+    "enforce": false,
+    "pct_of_profit": 0.3,
+    "pct_low_profit_basis_of_drawdown": 0.3,
+    "pct_after_double_safety_net": 0.5
+  },
+  "apex_prohibitions": {
+    "_note": "VERIFIED from Apex's Prohibited Activities page. Apex's rules, not mine; several are enforced by this tool.",
+    "stop_loss_mandatory": true,
+    "no_disproportionate_risk": true,
+    "no_threshold_as_stop_loss": true,
+    "no_holding_through_market_close": true,
+    "no_hedging_or_correlated_opposite_positions": true,
+    "no_automation_or_algorithms": true,
+    "no_trade_copying_or_shared_resources": true,
+    "no_stockpiling_and_blowing_up_evals": true,
+    "tracked_violation_types": [
+      "Scaling",
+      "Hedging",
+      "MAE"
+    ]
+  },
+  "my_rules": {
+    "_note": "My design. The daily target is a CEILING, not a goal to beat: it is Apex's minimum qualifying daily profit plus a small buffer for commissions, so one clean trade can finish the day, the day counts toward the 5-day requirement, and every day stays a similar size (which is what satisfies the 50% consistency rule). commission_round_trip figures are estimates \u2014 replace them with your platform's actual rates.",
+    "day_reset_et": "18:00",
+    "daily_target_buffer_over_min": 25,
+    "risk_per_trade_pct_of_drawdown": 0.05,
+    "max_daily_loss_pct_of_drawdown": 0.15,
+    "min_reward_to_risk": 1.5,
+    "max_trades_per_day": 3,
+    "max_consecutive_losses_per_day": 2,
+    "cooldown_minutes_after_loss": 15,
+    "session_start_ct": "08:30",
+    "session_end_ct": "11:30",
+    "hard_flat_time_ct": "14:55",
+    "max_mae_multiple_of_risk": 1.0,
+    "allow_size_increase_after_win": false,
+    "lock_day_on_target_hit": true,
+    "max_stop_points": 12,
+    "min_stop_points": 2
+  }
+}

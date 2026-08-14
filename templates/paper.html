@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Paper engine — Trade Gate</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2b333d;
+    --txt:#e6edf3; --dim:#8b949e; --green:#3fb950; --red:#f85149;
+    --amber:#d29922; --blue:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:12px 20px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  h1{font-size:16px;margin:0;letter-spacing:.5px}
+  .tag{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#000;
+    background:var(--amber);border-radius:4px;padding:2px 7px;font-weight:700}
+  a{color:var(--blue)}
+  .wrap{display:grid;grid-template-columns:minmax(320px,400px) 1fr;gap:18px;padding:18px;
+    align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;margin-bottom:18px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);
+    margin:0 0 12px}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .kpi .lab{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .kpi .val{font-size:21px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:2px}
+  .green{color:var(--green)} .red{color:var(--red)} .amber{color:var(--amber)} .dim{color:var(--dim)}
+  .pos{border:1px solid #1c6b33;background:#0d2818;border-radius:8px;padding:12px}
+  .pos.short{border-color:#7d2b26;background:#2b0f0f}
+  .pos .big{font-size:19px;font-weight:700}
+  .rows{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-variant-numeric:tabular-nums}
+  .rows div:nth-child(odd){color:var(--dim)}
+  pre.log{background:#0b0e12;border:1px solid var(--line);border-radius:8px;padding:12px;
+    margin:0;max-height:340px;overflow:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+    white-space:pre-wrap}
+  .blocks{background:#2b0f0f;border:1px solid #7d2b26;border-radius:8px;padding:10px 12px;
+    margin-top:10px}
+  .blocks li{margin:4px 0}
+  footer{padding:0 20px 24px;color:var(--dim);font-size:12.5px;max-width:860px}
+</style>
+</head>
+<body>
+<header>
+  <h1>PAPER ENGINE</h1>
+  <span class="tag">simulated</span>
+  <span class="dim" id="asof">waiting for the first bar…</span>
+  <span style="margin-left:auto"><a href="/">← the gate</a></span>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h2>Today</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="lab">Day P&amp;L</div><div class="val" id="dpnl">—</div></div>
+        <div class="kpi"><div class="lab">Trades</div><div class="val" id="dtr">—</div></div>
+        <div class="kpi"><div class="lab">Loss budget left</div><div class="val" id="dbud">—</div></div>
+        <div class="kpi"><div class="lab">Qualifying day</div><div class="val" id="dqual">—</div></div>
+      </div>
+      <div id="blocks"></div>
+    </div>
+
+    <div class="card">
+      <h2>Position</h2>
+      <div id="pos"><span class="dim">Flat.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Opening range</h2>
+      <div class="rows">
+        <div>High</div><div id="orh">—</div>
+        <div>Low</div><div id="orl">—</div>
+        <div>Width</div><div id="orw">—</div>
+        <div>Last price</div><div id="last">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Account</h2>
+      <div class="rows">
+        <div>Balance</div><div id="abal">—</div>
+        <div>Qualifying days</div><div id="aqd">—</div>
+        <div>To first payout</div><div id="apay">—</div>
+        <div>Room to threshold</div><div id="abuf">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>What the engine did</h2>
+      <pre class="log" id="log">Nothing yet.</pre>
+    </div>
+    <div class="card">
+      <h2>Session reports</h2>
+      <div id="reports" class="dim">None yet.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  This page watches a simulation. The engine reads delayed price bars, applies the written
+  rules and fills against the bar data. It holds no credentials, connects to no broker and
+  cannot place an order. Nothing here is an instruction to trade.
+</footer>
+
+<script>
+const money = v => (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined,
+  {minimumFractionDigits:2, maximumFractionDigits:2});
+const px = v => v == null ? "—" : Number(v).toFixed(2);
+
+async function tick(){
+  let s;
+  try { s = await (await fetch("/api/paper")).json(); } catch(e){ return; }
+  if(!s.running){ document.getElementById("asof").textContent =
+    "engine not running — start it with paper_engine.py"; return; }
+
+  // Show the bar's own clock, in CT, not the browser's timezone.
+  document.getElementById("asof").textContent =
+    "as of " + s.as_of.slice(11, 16) + " CT · " + (s.session_date || "");
+
+  const d = s.day || {}, a = s.account || {};
+  const pnl = d.realized || 0;
+  const el = document.getElementById("dpnl");
+  el.textContent = money(pnl);
+  el.className = "val " + (pnl > 0 ? "green" : pnl < 0 ? "red" : "");
+  document.getElementById("dtr").textContent = d.trades ?? "—";
+  document.getElementById("dbud").textContent = money(d.loss_budget_remaining || 0);
+  const q = document.getElementById("dqual");
+  q.textContent = d.qualifies ? "YES" : "not yet";
+  q.className = "val " + (d.qualifies ? "green" : "dim");
+
+  const b = document.getElementById("blocks");
+  b.innerHTML = (s.blocks && s.blocks.length)
+    ? '<div class="blocks"><ul class="reasons">' +
+      s.blocks.map(x => "<li>" + x + "</li>").join("") + "</ul></div>"
+    : "";
+
+  const p = s.position, pe = document.getElementById("pos");
+  pe.innerHTML = p
+    ? '<div class="pos ' + p.side + '"><div class="big">' + p.side.toUpperCase() + " " +
+      p.contracts + '</div><div class="rows"><div>Entry</div><div>' + px(p.entry) +
+      "</div><div>Stop</div><div>" + px(p.stop) + "</div><div>Target</div><div>" +
+      px(p.target) + "</div></div></div>"
+    : '<span class="dim">Flat.</span>';
+
+  document.getElementById("orh").textContent = px(s.or_high);
+  document.getElementById("orl").textContent = px(s.or_low);
+  document.getElementById("orw").textContent =
+    (s.or_high && s.or_low) ? (s.or_high - s.or_low).toFixed(2) + " pts" : "—";
+  document.getElementById("last").textContent = px(s.last_price);
+
+  document.getElementById("abal").textContent = money(a.balance || 0);
+  document.getElementById("aqd").textContent =
+    (s.payout ? s.payout.qualifying_days + " of " + s.payout.qualifying_days_needed : "—");
+  document.getElementById("apay").textContent = money(
+    Math.max(0, (a.profit_to_first_request || 0) - (a.total || 0)));
+  document.getElementById("abuf").textContent = money(a.buffer_to_threshold || 0);
+
+  document.getElementById("log").textContent =
+    (s.events && s.events.length) ? s.events.join("\n") : "No signal yet today.";
+  document.getElementById("reports").innerHTML =
+    (s.reports && s.reports.length) ? s.reports.join("<br>") : "None yet.";
+}
+tick(); setInterval(tick, 5000);
+</script>
+</body>
+</html>

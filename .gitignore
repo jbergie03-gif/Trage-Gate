@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+journal.db
+paper_state.json
+live.log
+es_1m.csv

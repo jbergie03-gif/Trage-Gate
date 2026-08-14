@@ -1,0 +1,204 @@
+//@version=5
+// ============================================================================
+// Fibonacci pullback (.618 / .786 bounce) — MES/ES — BACKTEST ONLY
+//
+// Your strategy #2, made mechanical. The part you do by eye — "which leg" — is defined
+// here by pivots, because a Fib level drawn after the fact always looks better than it
+// trades. Change the pivot length and watch the results move: that sensitivity is itself
+// the finding, and it is why this setup needs a written definition before it is traded.
+//
+// Structure kept from your description: entry in the .618-.786 retracement zone, stop
+// beyond the full retracement (the leg's origin). The target is the missing piece, so it
+// is a setting here.
+//
+// !! DO NOT CONNECT THIS TO A BROKER !!
+// Auto-executing a strategy through the TradingView-Tradovate link is algorithmic
+// execution. On an Apex account that forfeits the account and the balance. Tester only.
+//
+// Alerts: this fires alert() calls with the whole ticket - side, size, stop, target and the
+// dollar risk - so nothing has to be calculated while the level is being tested. Create the
+// alert with Condition = this script, and leave the webhook field EMPTY. Notifications to
+// your phone only. You place every order by hand.
+//
+// Timeframe note: pivot length is measured in BARS, so a 10-bar pivot on a 2-minute chart
+// covers 20 minutes of price and a 10-bar pivot on a 1-minute chart covers 10. Comparing
+// timeframes at the same pivot length is comparing two different setups. To hold the leg
+// definition constant while changing the chart, halve the pivot length when you double the
+// bar size (1-min/10 <-> 2-min/5).
+// ============================================================================
+strategy("Fib pullback .618/.786 — backtest only", overlay=true,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     initial_capital=100000, currency=currency.USD,
+     commission_type=strategy.commission.cash_per_contract, commission_value=0.62,
+     process_orders_on_close=true)
+
+grpL = "Leg definition"
+pivLen   = input.int(10, "Pivot length (bars each side)", minval=2, group=grpL,
+     tooltip="How the impulse leg is found. This single number changes everything — test several.")
+minLegPts= input.float(6, "Minimum leg size (points)", minval=0.25, group=grpL)
+maxBars  = input.int(120, "Abandon the setup after N bars", minval=5, group=grpL)
+
+grpZ = "Entry zone"
+fibNear  = input.float(0.618, "Zone start", group=grpZ)
+fibFar   = input.float(0.786, "Zone end", group=grpZ)
+stopBuf  = input.float(0.25, "Stop beyond the leg origin (points)", minval=0.0, group=grpZ)
+
+grpR = "Risk (the gate's rules)"
+riskUsd    = input.float(150, "Risk per trade ($)", minval=1, group=grpR)
+minStopPts = input.float(2,  "Minimum stop (points)", minval=0.25, group=grpR)
+maxStopPts = input.float(12, "Maximum stop (points)", minval=0.25, group=grpR)
+dayTarget  = input.float(325, "Lock the day at + $", minval=0, group=grpR)
+dayStop    = input.float(450, "Lock the day at - $", minval=0, group=grpR)
+maxTrades  = input.int(3,    "Max trades per day", minval=1, group=grpR)
+useGate    = input.bool(true,"Apply the daily locks", group=grpR)
+
+grpX = "Exit rule — change this one at a time"
+exitRule = input.string("Fixed 2R", "Exit", group=grpX,
+     options=["Fixed 1.5R", "Fixed 2R", "Back to the leg high/low", "Trail 1R after 1R"])
+
+grpS = "Session"
+sessStr = input.session("0830-1130", "Entry window (chart time)", group=grpS)
+flatStr = input.session("1455-1500", "Hard flat window (chart time)", group=grpS)
+inSession = not na(time(timeframe.period, sessStr))
+mustFlat  = not na(time(timeframe.period, flatStr))
+
+// ---------------------------------------------------------------- pivots -> leg
+ph = ta.pivothigh(high, pivLen, pivLen)
+pl = ta.pivotlow(low,  pivLen, pivLen)
+
+var float legLow   = na   // origin of an up leg
+var float legHigh  = na   // end of an up leg
+var int   legDir   = 0    // 1 = up leg (look for long), -1 = down leg (look for short)
+var int   legBar   = na
+
+if not na(pl)
+    legLow  := pl
+    if not na(legHigh) and legHigh > legLow + minLegPts
+        legDir := -1      // high then low: down leg, look to short the bounce
+        legBar := bar_index
+if not na(ph)
+    legHigh := ph
+    if not na(legLow) and legHigh > legLow + minLegPts
+        legDir := 1       // low then high: up leg, look to buy the pullback
+        legBar := bar_index
+
+legValid = legDir != 0 and not na(legHigh) and not na(legLow)
+     and (legHigh - legLow) >= minLegPts and (bar_index - nz(legBar)) <= maxBars
+
+// Retracement zone. For an up leg it sits below the high; for a down leg, above the low.
+legSize  = legHigh - legLow
+zoneNear = legDir == 1 ? legHigh - legSize * fibNear : legLow + legSize * fibNear
+zoneFar  = legDir == 1 ? legHigh - legSize * fibFar  : legLow + legSize * fibFar
+
+// ---------------------------------------------------------------- daily gate
+var int   tradesToday = 0
+var float dayStartEq  = na
+var bool  dayLocked   = false
+if ta.change(time("D")) != 0
+    tradesToday := 0
+    dayLocked   := false
+    dayStartEq  := strategy.equity
+dayPnl = strategy.equity - nz(dayStartEq, strategy.equity)
+if useGate and (dayPnl >= dayTarget or dayPnl <= -dayStop or tradesToday >= maxTrades)
+    dayLocked := true
+
+// ---------------------------------------------------------------- entry
+// Price must trade into the zone, then close back out of it in the leg's direction:
+// a bounce, not a knife caught mid-fall.
+touched = legValid and (legDir == 1 ? low  <= zoneNear : high >= zoneNear)
+bounce  = legDir == 1 ? close > zoneNear and close > open : close < zoneNear and close < open
+
+stopLvl = legDir == 1 ? legLow - stopBuf : legHigh + stopBuf
+stopPts = math.abs(close - stopLvl)
+sizeOk  = stopPts >= minStopPts and stopPts <= maxStopPts
+qty     = math.max(1, math.round(riskUsd / math.max(stopPts * syminfo.pointvalue, 0.01)))
+
+allowed = strategy.position_size == 0 and inSession and not mustFlat and sizeOk
+     and legValid and touched and bounce and (not useGate or not dayLocked)
+
+// Alert text is the full ticket, so nothing has to be worked out while the level is being
+// tested. A notification to you — never connect it to a broker.
+ticket(dir, px, sl, tp, n) =>
+    dir + " " + str.tostring(n) + " " + syminfo.ticker
+      + "  entry ~" + str.tostring(px, format.mintick)
+      + "  stop " + str.tostring(sl, format.mintick)
+      + "  target " + str.tostring(tp, format.mintick)
+      + "  |  risk " + str.tostring(math.round(math.abs(px - sl) * syminfo.pointvalue * n))
+      + " USD  reward "
+      + str.tostring(math.round(math.abs(tp - px) * syminfo.pointvalue * n)) + " USD"
+      + "  |  stop " + str.tostring(math.abs(px - sl), format.mintick) + " pts"
+      + "  ·  place it yourself, then log it in Trade Gate"
+
+if allowed and legDir == 1
+    strategy.entry("L", strategy.long, qty=qty)
+    tradesToday += 1
+    alert(ticket("LONG", close, stopLvl, close + stopPts * 2, qty),
+         alert.freq_once_per_bar_close)
+    legDir := 0        // one attempt per leg
+else if allowed and legDir == -1
+    strategy.entry("S", strategy.short, qty=qty)
+    tradesToday += 1
+    alert(ticket("SHORT", close, stopLvl, close - stopPts * 2, qty),
+         alert.freq_once_per_bar_close)
+    legDir := 0
+
+// The zone being approached is worth a heads-up: it gives you time to be at the screen.
+approaching = legValid and strategy.position_size == 0 and inSession and not touched
+     and (legDir == 1 ? low <= zoneNear + stopPts * 0.5 : high >= zoneNear - stopPts * 0.5)
+if approaching and barstate.isconfirmed
+    alert("WATCH — price approaching the "
+         + str.tostring(fibNear) + " level at " + str.tostring(zoneNear, format.mintick)
+         + " (" + (legDir == 1 ? "long" : "short") + " setup). No order yet.",
+         alert.freq_once_per_bar)
+
+var bool lockSaid = false
+if ta.change(time("D")) != 0
+    lockSaid := false
+if useGate and dayLocked and not lockSaid
+    lockSaid := true
+    alert("DONE FOR THE DAY — day P&L " + str.tostring(math.round(dayPnl))
+         + " USD. Close the platform.", alert.freq_once_per_bar_close)
+
+if strategy.position_size != 0 and mustFlat and not mustFlat[1]
+    alert("FLATTEN NOW — hard flat time. Holding through the close forfeits the account.",
+         alert.freq_once_per_bar_close)
+
+// ---------------------------------------------------------------- exit
+var float ePx = na
+var float sPx = na
+var float rPt = na
+var float legTgt = na
+if strategy.position_size != 0 and na(ePx)
+    ePx := strategy.position_avg_price
+    sPx := stopLvl
+    rPt := math.abs(ePx - sPx)
+    legTgt := strategy.position_size > 0 ? legHigh : legLow
+if strategy.position_size == 0
+    ePx := na
+    sPx := na
+    rPt := na
+    legTgt := na
+
+if strategy.position_size != 0 and not na(rPt)
+    isLong = strategy.position_size > 0
+    id     = isLong ? "L" : "S"
+    mult   = exitRule == "Fixed 1.5R" ? 1.5 : 2.0
+    tgt    = isLong ? ePx + rPt * mult : ePx - rPt * mult
+
+    if exitRule == "Fixed 1.5R" or exitRule == "Fixed 2R"
+        strategy.exit(id + "x", id, stop=sPx, limit=tgt)
+    else if exitRule == "Back to the leg high/low"
+        strategy.exit(id + "x", id, stop=sPx, limit=legTgt)
+    else if exitRule == "Trail 1R after 1R"
+        strategy.exit(id + "x", id, stop=sPx,
+             trail_points=rPt / syminfo.mintick, trail_offset=rPt / syminfo.mintick)
+
+if strategy.position_size != 0 and mustFlat
+    strategy.close_all(comment="flat")
+
+// ---------------------------------------------------------------- plots
+plot(legValid ? zoneNear : na, "0.618", color.new(color.orange, 0), 1, plot.style_linebr)
+plot(legValid ? zoneFar  : na, "0.786", color.new(color.orange, 50), 1, plot.style_linebr)
+plot(legValid ? (legDir == 1 ? legLow : legHigh) : na, "leg origin (stop)",
+     color.new(color.red, 0), 1, plot.style_linebr)
+bgcolor(useGate and dayLocked ? color.new(color.orange, 92) : na)

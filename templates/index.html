@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trade Gate</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2b333d;
+    --txt:#e6edf3; --dim:#8b949e; --green:#3fb950; --red:#f85149;
+    --amber:#d29922; --blue:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:12px 20px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  h1{font-size:16px;margin:0;letter-spacing:.5px}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:6px;padding:6px 8px;font-size:13px}
+  .wrap{display:grid;grid-template-columns:minmax(340px,420px) 1fr;gap:18px;padding:18px;
+    align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;margin-bottom:18px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);
+    margin:0 0 12px}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .kpi .lab{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .kpi .val{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:2px}
+  .green{color:var(--green)} .red{color:var(--red)} .amber{color:var(--amber)}
+  .bar{height:7px;background:#0b0e12;border-radius:4px;overflow:hidden;margin-top:8px}
+  .bar>i{display:block;height:100%;background:var(--green)}
+  .status{border-radius:10px;padding:14px 16px;margin-bottom:18px;border:1px solid}
+  .status.ok{background:#0d2818;border-color:#1c6b33}
+  .status.no{background:#2b0f0f;border-color:#7d2b26}
+  .status .big{font-size:19px;font-weight:700;letter-spacing:.5px}
+  ul.reasons{margin:8px 0 0;padding-left:18px}
+  ul.reasons li{margin:4px 0}
+  .warn{background:#2a2109;border:1px solid #7a5c11;border-radius:8px;padding:10px 12px;
+    margin-top:10px;color:#f0d68a;font-size:13px}
+  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--dim);margin:10px 0 4px}
+  input,textarea{width:100%;background:var(--panel2);color:var(--txt);
+    border:1px solid var(--line);border-radius:6px;padding:9px 10px;font-size:15px;
+    font-variant-numeric:tabular-nums}
+  textarea{font-size:13px;min-height:52px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  button{width:100%;border:0;border-radius:8px;padding:12px;font-size:14px;font-weight:650;
+    cursor:pointer;margin-top:12px;letter-spacing:.4px}
+  .btn-blue{background:var(--blue);color:#04121f}
+  .btn-green{background:var(--green);color:#04160a}
+  .btn-red{background:var(--red);color:#1c0403}
+  .btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .toggle{display:flex;gap:8px;margin-top:4px}
+  .toggle button{margin:0;background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+  .toggle button.on{background:var(--blue);color:#04121f;border-color:var(--blue)}
+  .ticket{background:#04121f;border:1px solid var(--blue);border-radius:8px;padding:12px;
+    margin-top:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+  .ticket .hd{color:var(--blue);font-weight:700;letter-spacing:1px;margin-bottom:8px}
+  .ticket div{margin:3px 0}
+  .err{background:#2b0f0f;border:1px solid #7d2b26;border-radius:8px;padding:10px 12px;
+    margin-top:10px;font-size:13px;color:#ffb3ae}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;
+    font-variant-numeric:tabular-nums}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;
+    letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid #21272f}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.long{background:#0d2818;color:var(--green)}
+  .pill.short{background:#2b0f0f;color:var(--red)}
+  .pill.open{background:#2a2109;color:var(--amber)}
+  .foot{color:var(--dim);font-size:11.5px;padding:0 20px 24px;line-height:1.6}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>TRADE&nbsp;GATE</h1>
+  <select id="account"></select>
+  <span id="acctRules" style="color:var(--dim);font-size:11.5px"></span>
+  <select id="instrument">
+    <option value="MES">MES ($5/pt)</option>
+    <option value="ES">ES ($50/pt)</option>
+  </select>
+  <span id="clock" style="color:var(--dim);font-size:12px;margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <div>
+    <div id="status" class="status no"><div class="big">Loading…</div></div>
+
+    <div class="card">
+      <h2>Stage a trade</h2>
+      <label>Direction</label>
+      <div class="toggle">
+        <button id="btnLong" class="on" onclick="setSide('long')">LONG</button>
+        <button id="btnShort" onclick="setSide('short')">SHORT</button>
+      </div>
+      <div class="row3">
+        <div><label>Entry</label><input id="entry" type="number" step="0.25" inputmode="decimal"></div>
+        <div><label>Stop</label><input id="stop" type="number" step="0.25" inputmode="decimal"></div>
+        <div><label>Target</label><input id="target" type="number" step="0.25" inputmode="decimal"></div>
+      </div>
+      <label>Setup tag (so the journal can tell you what actually works)</label>
+      <input id="setup" placeholder="e.g. opening-range reclaim">
+      <button class="btn-blue" onclick="calc()">CALCULATE SIZE</button>
+      <div id="sizeOut"></div>
+      <div id="confirmBox" class="hidden">
+        <button id="btnConfirm" class="btn-green" onclick="confirmTrade()">CONFIRM &amp; LOG THIS TRADE</button>
+      </div>
+      <div id="overrideBox" class="hidden">
+        <label>Override reason (recorded permanently, min 15 chars)</label>
+        <textarea id="overrideReason" placeholder="Why are you breaking your own rule?"></textarea>
+        <button class="btn-red" onclick="confirmTrade(true)">OVERRIDE THE GATE ANYWAY</button>
+      </div>
+    </div>
+
+    <div id="openCard" class="card hidden">
+      <h2>Open trade — log the exit</h2>
+      <div id="openInfo" class="ticket"></div>
+      <label>Exit fill price</label>
+      <input id="exitPrice" type="number" step="0.25" inputmode="decimal">
+      <label>What happened (one line)</label>
+      <textarea id="exitNotes" placeholder="Stopped at the high / target hit / cut early out of fear"></textarea>
+      <button class="btn-blue" onclick="closeTrade()">RECORD EXIT</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Today</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="lab">Realized P&amp;L</div><div class="val" id="kDayPnl">—</div></div>
+        <div class="kpi"><div class="lab">Loss budget left</div><div class="val" id="kLossLeft">—</div></div>
+        <div class="kpi"><div class="lab">Daily target (a ceiling)</div><div class="val" id="kTarget">—</div>
+          <div class="bar"><i id="barTarget" style="width:0"></i></div>
+          <div id="targetNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Trades / cap</div><div class="val" id="kTrades">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Payout progress — the only scoreboard that matters</h2>
+      <div id="payoutBox"></div>
+      <div class="kpis" style="margin-top:12px">
+        <div class="kpi"><div class="lab">Account P&amp;L</div><div class="val" id="kAcctPnl">—</div>
+          <div class="bar"><i id="barAcct" style="width:0"></i></div>
+          <div id="acctNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Qualifying days</div><div class="val" id="kDays">—</div>
+          <div id="daysNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Withdrawable now</div><div class="val" id="kWith">—</div>
+          <div id="withNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Biggest day share</div><div class="val" id="kBest">—</div>
+          <div id="bestNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Buffer to EOD threshold</div><div class="val" id="kBuffer">—</div>
+          <div id="buffNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+        <div class="kpi"><div class="lab">Payouts taken</div><div class="val" id="kPayouts">—</div>
+          <div id="payNote" style="font-size:11px;color:var(--dim);margin-top:4px"></div></div>
+      </div>
+      <button id="btnPayout" class="btn-green hidden" onclick="logPayout()">I REQUESTED THIS PAYOUT — LOG IT</button>
+    </div>
+
+    <div class="card">
+      <h2>Journal</h2>
+      <div id="stats" style="color:var(--dim);font-size:12.5px;margin-bottom:10px"></div>
+      <table><thead><tr><th>#</th><th>Date</th><th>Side</th><th>Ctr</th>
+        <th>Entry</th><th>Stop</th><th>Exit</th><th>P&amp;L</th><th>Setup</th></tr></thead>
+        <tbody id="journalBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<script>
+let side = 'long', S = null, sized = null;
+
+const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US',
+  {minimumFractionDigits:2, maximumFractionDigits:2});
+const cls = n => n > 0 ? 'val green' : (n < 0 ? 'val red' : 'val');
+
+function setSide(s){
+  side = s;
+  document.getElementById('btnLong').className = s==='long' ? 'on' : '';
+  document.getElementById('btnShort').className = s==='short' ? 'on' : '';
+}
+
+async function load(){
+  S = await (await fetch('/api/state')).json();
+  render();
+  loadJournal();
+}
+
+function render(){
+  const L = S.limits, D = S.day, A = S.account;
+
+  const acc = document.getElementById('account');
+  if(!acc.options.length){
+    S.account_sizes.forEach(a=>{
+      const o=document.createElement('option'); o.value=a; o.textContent=a+' EOD'; acc.add(o);
+    });
+  }
+  acc.value = L.account;
+  document.getElementById('instrument').value = L.instrument;
+  document.getElementById('acctRules').textContent =
+    'need +' + money(L.profit_to_first_request) + ' · EOD DD ' + money(L.eod_drawdown)
+    + ' · Apex DLL ' + money(L.apex_daily_loss_limit) + ' · max ' + L.max_contracts + ' ' + L.instrument;
+
+  const st = document.getElementById('status');
+  st.className = 'status ' + (S.can_trade ? 'ok' : 'no');
+  let html = '<div class="big">' + (S.can_trade ? '✔ CLEARED TO TRADE' : '✖ GATE CLOSED') + '</div>';
+  if(S.blocks.length) html += '<ul class="reasons">' + S.blocks.map(b=>'<li>'+b+'</li>').join('') + '</ul>';
+  if(S.can_trade) html += '<div style="color:var(--dim);font-size:12.5px;margin-top:6px">Risk per trade '
+    + money(L.risk_per_trade) + ' · max ' + L.max_contracts + ' ' + L.instrument
+    + ' · stop 2–' + S.rules.max_stop_points + ' pts · min ' + S.rules.min_reward_to_risk + ':1</div>';
+  S.warnings.forEach(w => html += '<div class="warn">'+w+'</div>');
+  st.innerHTML = html;
+
+  document.getElementById('kDayPnl').outerHTML =
+    '<div class="'+cls(D.realized)+'" id="kDayPnl">'+money(D.realized)+'</div>';
+  document.getElementById('kLossLeft').outerHTML =
+    '<div class="val'+(D.loss_budget_remaining<=0?' red':'')+'" id="kLossLeft">'
+    + money(D.loss_budget_remaining)+'</div>';
+  document.getElementById('kTarget').outerHTML =
+    '<div class="val'+(D.qualifies?' green':'')+'" id="kTarget">'+money(L.daily_target)+'</div>';
+  document.getElementById('barTarget').style.width =
+    Math.max(0, Math.min(100, D.target_progress*100)) + '%';
+  document.getElementById('kTrades').textContent = D.trades + ' / ' + S.rules.max_trades_per_day;
+  document.getElementById('targetNote').textContent = D.qualifies
+    ? 'this day COUNTS toward your 5'
+    : 'needs ' + money(L.min_daily_profit) + ' net to count · one ' + L.rr_for_one_trade_day + ':1 trade does it';
+
+  document.getElementById('kAcctPnl').outerHTML =
+    '<div class="'+cls(A.total)+'" id="kAcctPnl">'+money(A.total)+'</div>';
+  document.getElementById('barAcct').style.width =
+    Math.max(0, Math.min(100, A.target_progress*100)) + '%';
+  document.getElementById('acctNote').textContent =
+    'balance ' + money(A.balance) + ' · need ' + money(L.start_balance + L.profit_to_first_request);
+
+  const P = S.payout;
+  document.getElementById('kDays').outerHTML =
+    '<div class="val'+(P.qualifying_days >= P.qualifying_days_needed ? ' green':'')+'" id="kDays">'
+    + P.qualifying_days + ' / ' + P.qualifying_days_needed + '</div>';
+  document.getElementById('daysNote').textContent = 'days with ' + money(L.min_daily_profit) + '+ net';
+  document.getElementById('kWith').textContent = money(P.withdrawable_above_safety_net);
+  document.getElementById('withNote').textContent =
+    'above safety net ' + money(L.safety_net_profit) + ' · min request ' + money(S.payout_rules.min_payout_amount);
+  const share = (A.best_day_share*100).toFixed(0) + '%';
+  document.getElementById('kBest').outerHTML =
+    '<div class="val'+(P.consistency_ok ? ' green':' red')+'" id="kBest">' + share + '</div>';
+  document.getElementById('bestNote').textContent =
+    'must stay under ' + (S.payout_rules.consistency_pct*100).toFixed(0) + '% · cap today ' + money(D.consistency_cap);
+  document.getElementById('kBuffer').outerHTML =
+    '<div class="val'+(A.buffer_to_threshold <= L.max_daily_loss ? ' red':' green')+'" id="kBuffer">'
+    + money(A.buffer_to_threshold) + '</div>';
+  document.getElementById('buffNote').textContent =
+    'threshold at ' + money(L.start_balance + A.eod_threshold) + ' · touching it fails the account';
+  document.getElementById('kPayouts').textContent = P.payouts_taken + ' / ' + P.max_payouts;
+  document.getElementById('payNote').textContent =
+    'next capped at ' + money(P.next_payout_cap) + ' · 100% split';
+
+  const pb = document.getElementById('payoutBox');
+  const btn = document.getElementById('btnPayout');
+  if(P.eligible){
+    pb.innerHTML = '<div class="status ok" style="margin:0"><div class="big">✔ PAYOUT AVAILABLE — '
+      + money(P.request_amount) + '</div><div style="font-size:13px;margin-top:6px">'
+      + 'Every requirement is met. Request it on your Apex dashboard now, then log it here.</div></div>';
+    btn.classList.remove('hidden');
+    btn.dataset.amount = P.request_amount;
+  } else {
+    pb.innerHTML = '<div class="status no" style="margin:0"><div class="big">PAYOUT LOCKED</div>'
+      + '<ul class="reasons">' + P.missing.map(m=>'<li>'+m+'</li>').join('') + '</ul></div>';
+    btn.classList.add('hidden');
+  }
+
+  const oc = document.getElementById('openCard');
+  if(D.open_trade){
+    const t = D.open_trade;
+    oc.classList.remove('hidden');
+    document.getElementById('openInfo').innerHTML =
+      '<div class="hd">#'+t.id+' '+t.side.toUpperCase()+' '+t.contracts+' '+t.instrument+'</div>'
+      +'<div>entry '+t.entry+'  stop '+t.stop+'  target '+t.target+'</div>'
+      +'<div>risk '+money(t.risk_dollars)+'  reward '+money(t.reward_dollars)+'</div>';
+    document.getElementById('openInfo').dataset.id = t.id;
+  } else oc.classList.add('hidden');
+
+  document.getElementById('foot').innerHTML =
+    '<b>This tool never places an order.</b> Apex prohibits automation — it gates, sizes, and journals; '
+    + 'you place every fill by hand.<br>'
+    + 'All Apex figures verified against the EOD Evaluations and EOD Payouts pages. '
+    + 'Risk per trade, daily stop, trade caps and the session window are my rules, deliberately '
+    + 'tighter than Apex requires — Apex would let you lose ' + money(L.apex_daily_loss_limit)
+    + ' a day, and that permission is what ended the last accounts.';
+}
+
+async function calc(){
+  const body = {side, entry:+document.getElementById('entry').value,
+    stop:+document.getElementById('stop').value, target:+document.getElementById('target').value};
+  sized = await (await fetch('/api/size',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+  const out = document.getElementById('sizeOut');
+  document.getElementById('confirmBox').classList.add('hidden');
+  document.getElementById('overrideBox').classList.add('hidden');
+
+  if(!sized.ok){
+    out.innerHTML = '<div class="err">' + sized.errors.join('<br>') + '</div>';
+    return;
+  }
+  out.innerHTML = '<div class="ticket"><div class="hd">ORDER TICKET — VERIFY BEFORE CONFIRMING</div>'
+    + '<div>'+side.toUpperCase()+' '+sized.contracts+' '+sized.instrument
+    + ' @ '+document.getElementById('entry').value+'</div>'
+    + '<div>STOP '+document.getElementById('stop').value+'  ('+sized.stop_points+' pts, '
+    + money(sized.risk_dollars)+' risk / cap '+money(sized.risk_cap)+')</div>'
+    + '<div>TARGET '+document.getElementById('target').value+'  ('+sized.reward_points+' pts, '
+    + money(sized.reward_dollars)+')</div>'
+    + '<div>R:R '+sized.reward_to_risk+':1  ·  fees '+money(sized.commission)+'</div>'
+    + '<div>NET win '+money(sized.net_if_target_hit)+'  ·  NET loss '+money(sized.net_if_stopped)+'</div>'
+    + '<div style="color:'+(sized.makes_qualifying_day?'var(--green)':'var(--amber)')+'">'
+    + (sized.makes_qualifying_day
+        ? 'a win here makes today a QUALIFYING day'
+        : 'a win here is NOT enough for a qualifying day on its own')
+    + '</div></div>';
+
+  if(sized.can_trade){
+    document.getElementById('confirmBox').classList.remove('hidden');
+  } else {
+    out.innerHTML += '<div class="err"><b>The gate is closed:</b><br>'+sized.blocks.join('<br>')+'</div>';
+    document.getElementById('overrideBox').classList.remove('hidden');
+  }
+}
+
+async function confirmTrade(override){
+  const body = {side, entry:+document.getElementById('entry').value,
+    stop:+document.getElementById('stop').value, target:+document.getElementById('target').value,
+    setup:document.getElementById('setup').value, override:!!override,
+    override_reason:document.getElementById('overrideReason').value};
+  const res = await fetch('/api/confirm',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await res.json();
+  if(!j.ok){
+    document.getElementById('sizeOut').innerHTML +=
+      '<div class="err">'+(j.errors||['Rejected']).join('<br>')+'</div>';
+    if(j.needs_override) document.getElementById('overrideBox').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('sizeOut').innerHTML = '';
+  document.getElementById('confirmBox').classList.add('hidden');
+  document.getElementById('overrideBox').classList.add('hidden');
+  document.getElementById('overrideReason').value = '';
+  load();
+}
+
+async function closeTrade(){
+  const id = document.getElementById('openInfo').dataset.id;
+  const j = await (await fetch('/api/close',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({trade_id:id, exit_price:+document.getElementById('exitPrice').value,
+      notes:document.getElementById('exitNotes').value})})).json();
+  if(!j.ok){ alert((j.errors||['error']).join('\n')); return; }
+  document.getElementById('exitPrice').value='';
+  document.getElementById('exitNotes').value='';
+  load();
+}
+
+async function logPayout(){
+  const amount = +document.getElementById('btnPayout').dataset.amount;
+  if(!confirm('Log a requested payout of ' + money(amount) + '?\n\nOnly do this after you have '
+    + 'actually submitted the request on your Apex dashboard.')) return;
+  await fetch('/api/payout',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({amount, approved:true})});
+  load();
+}
+
+async function loadJournal(){
+  const j = await (await fetch('/api/journal')).json();
+  const s = j.stats;
+  document.getElementById('stats').innerHTML = s.closed
+    ? s.closed+' closed · win rate '+(s.win_rate*100).toFixed(0)+'% · avg win '
+      + money(s.avg_win)+' · avg loss '+money(s.avg_loss)
+      + ' · expectancy '+money(s.win_rate*s.avg_win + (1-s.win_rate)*s.avg_loss)+'/trade'
+      + (j.overrides.length ? ' · <span style="color:var(--red)">'+j.overrides.length+' overrides</span>' : '')
+    : 'No closed trades yet.';
+  document.getElementById('journalBody').innerHTML = j.trades.map(t=>{
+    const p = t.pnl===null
+      ? '<span class="pill open">OPEN</span>'
+      : '<span class="'+(t.pnl>0?'green':(t.pnl<0?'red':''))+'">'+money(t.pnl)+'</span>';
+    return '<tr><td>'+t.id+'</td><td>'+t.trade_date+'</td>'
+      +'<td><span class="pill '+t.side+'">'+t.side.toUpperCase()+'</span></td>'
+      +'<td>'+t.contracts+'</td><td>'+t.entry+'</td><td>'+t.stop+'</td>'
+      +'<td>'+(t.exit_price===null?'—':t.exit_price)+'</td><td>'+p+'</td>'
+      +'<td>'+(t.setup||'')+'</td></tr>';
+  }).join('');
+}
+
+document.getElementById('account').onchange = document.getElementById('instrument').onchange = async e => {
+  S = await (await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({account:document.getElementById('account').value,
+      instrument:document.getElementById('instrument').value})})).json();
+  render(); loadJournal();
+};
+
+setInterval(()=>{
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour12:false}) + ' CT';
+}, 1000);
+setInterval(load, 60000);
+load();
+</script>
+</body>
+</html>
