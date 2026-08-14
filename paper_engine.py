@@ -37,7 +37,7 @@ import rules  # noqa: E402  (must follow the env var so the paper DB is used)
 CT = ZoneInfo("America/Chicago")
 ET = ZoneInfo("America/New_York")
 STATE_FILE = BASE / "paper_state.json"
-REPORT_DIR = BASE / "reports"
+REPORT_DIR = Path(os.environ.get("TRADE_GATE_REPORTS", BASE / "reports"))
 
 
 @dataclass
@@ -86,6 +86,9 @@ class Session:
     leg_dir: int = 0            # 1 = up leg (buy the pullback), -1 = down leg
     leg_bar: int = 0
     fib_touched: bool = False
+    orb_side: str = ""
+    orb_stopped_out: bool = False
+    orb_retried: bool = False
 
     def log(self, ts: datetime, msg: str) -> None:
         self.events.append(f"{ts.strftime('%H:%M')} {msg}")
@@ -96,7 +99,8 @@ class PaperEngine:
     def __init__(self, cfg: dict, or_minutes: int, exit_rule: str, verbose: bool = True,
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
-                 runner_pct: float = 0.10):
+                 runner_pct: float = 0.10, stop_buffer: float = 0.0,
+                 orb_reentry: bool = False):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
@@ -105,6 +109,8 @@ class PaperEngine:
         self.min_leg_pts = min_leg_pts
         self.leg_max_bars = leg_max_bars
         self.runner_pct = runner_pct
+        self.stop_buffer = stop_buffer
+        self.orb_reentry = orb_reentry
         self.verbose = verbose
         self.write_live = write_live
         self.pos: Position | None = None
@@ -193,15 +199,36 @@ class PaperEngine:
                 side = "short"
             if side is not None:
                 s.took_break = True
+                s.orb_side = side
                 entry = s.or_high if side == "long" else s.or_low
-                stop = s.or_low if side == "long" else s.or_high
+                stop = self._orb_stop(side)
                 self._try_entry(bar, side, entry, stop, "ORB")
+                return
+
+        # One re-entry, and only after a stop-out: the same break, in the same direction,
+        # once price closes back through the level. A whipsaw through a tight opening range
+        # is not the setup failing; a second failure is.
+        if (self.orb_reentry and s.orb_stopped_out and not s.orb_retried
+                and s.orb_side and self.pos is None):
+            lvl = s.or_high if s.orb_side == "long" else s.or_low
+            through = bar.close > lvl if s.orb_side == "long" else bar.close < lvl
+            if through:
+                s.orb_retried = True
+                self._try_entry(bar, s.orb_side, bar.close,
+                                self._orb_stop(s.orb_side), "ORB2")
                 return
 
         # The Fib pullback is the second setup of the day: it only gets looked at while
         # flat, and it shares the day's trade count and every lock with the ORB trade.
         if "fib" in self.setups and self.pos is None:
             self._check_fib(bar)
+
+    def _orb_stop(self, side: str) -> float:
+        """Opposite end of the range, plus a buffer so a half-point poke is not the trade."""
+        s = self.session
+        assert s is not None and s.or_high is not None and s.or_low is not None
+        return (s.or_low - self.stop_buffer if side == "long"
+                else s.or_high + self.stop_buffer)
 
     # ------------------------------------------------------------------- fib
     def _pivot(self, bars: list[Bar], high_side: bool) -> float | None:
@@ -434,6 +461,8 @@ class PaperEngine:
             "r": round(points / p.r_points, 2) if p.r_points else 0.0,
             "pnl": pnl, "why": (f"2R scale-out, runner {why}" if p.scaled else why),
         })
+        if p.setup == "ORB" and why == "stop" and pnl < 0:
+            s.orb_stopped_out = True
         s.log(bar.ts, f"EXIT {why} @ {price:.2f}  {points:+.2f} pts  ${pnl:+,.2f}  "
                       f"(day ${state['day']['realized']:+,.2f})")
         self.pos = None
@@ -479,7 +508,7 @@ def write_state(cfg: dict, eng: PaperEngine, bar: Bar) -> None:
 
 def write_report(cfg: dict, s: Session) -> Path:
     """The end-of-session summary: what happened, and what it means for a payout."""
-    REPORT_DIR.mkdir(exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
     with rules.db() as conn:
         state = rules.evaluate(cfg, conn, when=datetime.strptime(s.date, "%Y-%m-%d")
                                .replace(hour=10, tzinfo=CT))
@@ -552,7 +581,7 @@ def write_report(cfg: dict, s: Session) -> Path:
 
 def write_summary(cfg: dict, sessions: list[Session], or_minutes: int, exit_rule: str) -> Path:
     """One file covering every session run, so the days stack into a record."""
-    REPORT_DIR.mkdir(exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
     lim = rules.limits(cfg)
     with rules.db() as conn:
         state = rules.evaluate(cfg, conn)
@@ -691,6 +720,10 @@ def main() -> None:
     ap.add_argument("--pivot-len", type=int, default=10,
                     help="bars each side of a Fib pivot — this one number moves everything")
     ap.add_argument("--min-leg", type=float, default=6.0, help="minimum Fib leg (points)")
+    ap.add_argument("--stop-buffer", type=float, default=0.0,
+                    help="points beyond the opposite end of the range for the ORB stop")
+    ap.add_argument("--orb-reentry", action="store_true",
+                    help="allow one ORB re-entry, same direction, after a stop-out")
     ap.add_argument("--runner-pct", type=float, default=0.10,
                     help="share of the position left as a runner by scale_2R (min 1 contract)")
     ap.add_argument("--reset", action="store_true", help="wipe the paper journal first")
@@ -706,7 +739,8 @@ def main() -> None:
     eng = PaperEngine(cfg, args.or_minutes, args.exit_rule,
                       write_live=bool(args.live or args.live_view),
                       setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
-                      runner_pct=args.runner_pct)
+                      runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
+                      orb_reentry=args.orb_reentry)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "

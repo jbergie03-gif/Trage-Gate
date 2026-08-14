@@ -1,20 +1,19 @@
 # Paper run summary — 1 sessions
 
-Setup: 2-minute opening range, exit `scale_2R`, 100K MES, $150 risk per trade.
+Setup: 2-minute opening range, exit `opposite_end`, 100K MES, $150 risk per trade.
 
 | setup | trades | net $ | wins |
 |---|---|---|---|
 | ORB | 1 | -139.96 | 0 |
-| ORB2 | 1 | +285.04 | 1 |
 
-- **Net P&L $145.08** across 2 trades (1W / 1L)
+- **Net P&L $-139.96** across 1 trades (0W / 1L)
 - Days traded: 1 of 1 — the rest had no setup the rules would take
-- Green days 1 of 1; worst day $145.08 (limit $450)
+- Green days 0 of 1; worst day $-139.96 (limit $450)
 - **Qualifying days (300+ net): 0** — 5 are needed for a payout
-- Account P&L now $145.08 of the $3,600 a first request needs
+- Account P&L now $-139.96 of the $3,600 a first request needs
 
 | date | trades | net $ | qualifying | how the day ended |
 |---|---|---|---|---|
-| 2026-08-14 | 2 | +145.08 | — | the day's one opening range break was taken and closed |
+| 2026-08-14 | 1 | -139.96 | — | the day's one opening range break was taken and closed |
 
 Sample-size warning: this is a few weeks of one market regime on delayed data with simulated fills. It shows the rules working, not that the setup has an edge. Years of history in the Strategy Tester decide that.
