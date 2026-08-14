@@ -62,6 +62,8 @@ class Position:
     setup: str = "orb"
     best: float = 0.0          # furthest favourable excursion, for the trailing exit
     trail: float = 0.0
+    scaled: bool = False       # the 2R scale-out has been taken; what is left is the runner
+    banked: float = 0.0        # net P&L already realised on the scaled-out contracts
 
 
 @dataclass
@@ -93,7 +95,8 @@ class Session:
 class PaperEngine:
     def __init__(self, cfg: dict, or_minutes: int, exit_rule: str, verbose: bool = True,
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
-                 pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120):
+                 pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
+                 runner_pct: float = 0.10):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
@@ -101,6 +104,7 @@ class PaperEngine:
         self.pivot_len = pivot_len
         self.min_leg_pts = min_leg_pts
         self.leg_max_bars = leg_max_bars
+        self.runner_pct = runner_pct
         self.verbose = verbose
         self.write_live = write_live
         self.pos: Position | None = None
@@ -279,9 +283,12 @@ class PaperEngine:
                 need = lim.daily_target + n * lim.commission_round_trip
                 tgt_pts = need / (n * lim.point_value)
         else:
-            tgt_pts = r_pts * (1.5 if self.exit_rule == "fixed_1.5R" else 2.0)
+            tgt_pts = r_pts * (1.5 if self.exit_rule == "fixed_1.5R" else 2.0)   # scale_2R: 2R
         target = entry + tgt_pts if side == "long" else entry - tgt_pts
-        if target_override is not None and self.exit_rule == "opposite_end":
+        # The Fib trade keeps its own structural target (the leg extreme) whatever the ORB
+        # exit rule is: a 2R Fib target lets through the setups the 1.5:1 gate exists to
+        # refuse, and those lost money badly in the pilot.
+        if target_override is not None:
             target = target_override
 
         sizing = rules.size_trade(self.cfg, side, entry, stop, target)
@@ -323,8 +330,12 @@ class PaperEngine:
         self.pos = Position(side=side, entry=entry, stop=stop, target=target,
                             contracts=sizing["contracts"], opened=bar.ts, trade_id=trade_id,
                             r_points=r_pts, setup=setup, best=entry, trail=stop)
-        aim = (f"target {target:.2f}" if self.exit_rule in
-               ("fixed_2R", "fixed_1.5R", "day_target") else f"exit on {self.exit_rule}")
+        if self.exit_rule == "scale_2R":
+            aim = f"target {target:.2f} (2R), then a runner on a breakeven trail"
+        elif self.exit_rule in ("fixed_2R", "fixed_1.5R", "day_target"):
+            aim = f"target {target:.2f}"
+        else:
+            aim = f"exit on {self.exit_rule}"
         s.log(bar.ts, f"ENTER {setup} {side.upper()} {sizing['contracts']} @ {entry:.2f}  "
                       f"stop {stop:.2f} ({r_pts:.2f} pts, ${sizing['risk_dollars']:,.0f})  {aim}")
 
@@ -343,9 +354,19 @@ class PaperEngine:
             self._exit(bar, p.trail, "stop")
             return
         target_rules = ("fixed_2R", "fixed_1.5R", "day_target")
+        if self.exit_rule == "scale_2R" and hit_target and not p.scaled:
+            self._scale_out(bar)
+            return
         if (self.exit_rule in target_rules or p.setup == "FIB") and hit_target:
             self._exit(bar, p.target, "target")
             return
+
+        # The runner trails a full R behind the best price it has seen, from a stop already
+        # at breakeven — so the worst it can do now is give back the runner's open profit.
+        if self.exit_rule == "scale_2R" and p.scaled:
+            p.best = max(p.best, bar.high) if long else min(p.best, bar.low)
+            new_trail = p.best - p.r_points if long else p.best + p.r_points
+            p.trail = max(p.trail, new_trail) if long else min(p.trail, new_trail)
 
         if self.exit_rule == "trail_after_1R":
             p.best = max(p.best, bar.high) if long else min(p.best, bar.low)
@@ -360,6 +381,35 @@ class PaperEngine:
         if self.exit_rule == "session_end" and not self._entry_window(bar.ts):
             self._exit(bar, bar.close, "session end")
 
+    def _scale_out(self, bar: Bar) -> None:
+        """Bank most of the position at 2R and let a runner work on a breakeven stop.
+
+        Runners only exist in whole contracts: 10% of 4 contracts is not a contract, so the
+        runner is rounded to at least one and the core to at least one. Below 2 contracts
+        there is nothing to split and the whole position comes off at the target.
+        """
+        p = self.pos
+        s = self.session
+        assert p is not None and s is not None
+        runner = max(1, round(p.contracts * self.runner_pct))
+        core = p.contracts - runner
+        if core < 1:
+            self._exit(bar, p.target, "target")
+            return
+
+        inst = self.cfg["instruments"][self.cfg["instrument"]]
+        points = (p.target - p.entry) if p.side == "long" else (p.entry - p.target)
+        banked = round(points * core * float(inst["point_value"])
+                       - core * float(inst["commission_round_trip"]), 2)
+
+        p.banked = banked
+        p.contracts = runner
+        p.scaled = True
+        p.trail = p.entry          # the runner can no longer lose money
+        p.best = bar.close
+        s.log(bar.ts, f"SCALE {core} out @ {p.target:.2f} (+2R, ${banked:+,.2f} banked) — "
+                      f"{runner} runner left, stop to breakeven")
+
     def _exit(self, bar: Bar, price: float, why: str) -> None:
         p = self.pos
         s = self.session
@@ -368,7 +418,7 @@ class PaperEngine:
         inst = self.cfg["instruments"][self.cfg["instrument"]]
         gross = points * p.contracts * float(inst["point_value"])
         fees = p.contracts * float(inst["commission_round_trip"])
-        pnl = round(gross - fees, 2)
+        pnl = round(gross - fees + p.banked, 2)
 
         with rules.db() as conn:
             conn.execute("UPDATE trades SET exit_price=?, pnl=?, closed_at=? WHERE id=?",
@@ -382,7 +432,7 @@ class PaperEngine:
             "side": p.side, "contracts": p.contracts, "entry": round(p.entry, 2),
             "stop": round(p.stop, 2), "exit": round(price, 2), "points": round(points, 2),
             "r": round(points / p.r_points, 2) if p.r_points else 0.0,
-            "pnl": pnl, "why": why,
+            "pnl": pnl, "why": (f"2R scale-out, runner {why}" if p.scaled else why),
         })
         s.log(bar.ts, f"EXIT {why} @ {price:.2f}  {points:+.2f} pts  ${pnl:+,.2f}  "
                       f"(day ${state['day']['realized']:+,.2f})")
@@ -633,7 +683,7 @@ def main() -> None:
                     help="seconds to pause per bar in replay (0 = as fast as possible)")
     ap.add_argument("--or-minutes", type=int, default=2)
     ap.add_argument("--exit", dest="exit_rule", default="opposite_end",
-                    choices=["opposite_end", "fixed_2R", "fixed_1.5R",
+                    choices=["opposite_end", "fixed_2R", "fixed_1.5R", "scale_2R",
                              "trail_after_1R", "session_end", "day_target"],
                     help="day_target sizes the target to finish a qualifying day in one trade")
     ap.add_argument("--setups", default="orb,fib",
@@ -641,6 +691,8 @@ def main() -> None:
     ap.add_argument("--pivot-len", type=int, default=10,
                     help="bars each side of a Fib pivot — this one number moves everything")
     ap.add_argument("--min-leg", type=float, default=6.0, help="minimum Fib leg (points)")
+    ap.add_argument("--runner-pct", type=float, default=0.10,
+                    help="share of the position left as a runner by scale_2R (min 1 contract)")
     ap.add_argument("--reset", action="store_true", help="wipe the paper journal first")
     ap.add_argument("--live-view", action="store_true",
                     help="update paper_state.json every bar so /paper can be watched")
@@ -653,7 +705,8 @@ def main() -> None:
     setups = tuple(s.strip().lower() for s in args.setups.split(",") if s.strip())
     eng = PaperEngine(cfg, args.or_minutes, args.exit_rule,
                       write_live=bool(args.live or args.live_view),
-                      setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg)
+                      setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
+                      runner_pct=args.runner_pct)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "

@@ -61,8 +61,12 @@ useGate    = input.bool(true,"Apply the daily locks", group=grpR,
      tooltip="Turn OFF to see what the same trades do without any discipline. That comparison is the whole point.")
 
 grpX = "Exit rule — change this one at a time"
-exitRule = input.string("Fixed 2R", "Exit", group=grpX,
-     options=["Opposite end only", "Fixed 2R", "Trail 1R after 1R", "Session end", "Fixed 1.5R"])
+exitRule = input.string("Scale 2R + runner", "Exit", group=grpX,
+     options=["Opposite end only", "Fixed 2R", "Scale 2R + runner", "Trail 1R after 1R",
+              "Session end", "Fixed 1.5R"])
+runnerPct = input.float(0.10, "Runner share of the position", minval=0.0, maxval=0.9, step=0.05,
+     group=grpX,
+     tooltip="Scale 2R + runner: the rest comes off at 2R and the runner trails from breakeven. Runners are whole contracts, so at 4 contracts 10% still means 1.")
 
 // ---------------------------------------------------------------- time helpers
 minsFromOpen = (hour * 60 + minute) - (openHour * 60 + openMin)
@@ -132,6 +136,16 @@ tick(dir, px, sl, tp, n) =>
       + "  |  stop width " + str.tostring(math.abs(px - sl), format.mintick) + " pts"
       + "  ·  place it yourself, then log it in Trade Gate"
 
+// With the scale-out exit the ticket needs two bracket lines, so spell them out.
+scaleNote(n) =>
+    r = math.max(1, math.round(n * runnerPct))
+    c = n - r
+    string s = ""
+    if exitRule == "Scale 2R + runner" and c >= 1
+        s := "  ||  SCALE: " + str.tostring(c) + " off at the 2R target, " + str.tostring(r)
+             + " runner — move the runner's stop to breakeven once the core fills"
+    s
+
 // The first break settles the day even when the rules refuse it: an untradable opening
 // break is a no-trade day, not a wait for the next break.
 if (longBreak or shortBreak) and flat and barstate.isconfirmed
@@ -140,12 +154,12 @@ if (longBreak or shortBreak) and flat and barstate.isconfirmed
 if allowed and longBreak
     strategy.entry("L", strategy.long, qty=qty)
     tradesToday += 1
-    alert(tick("LONG", orHigh, orLow, orHigh + rangePts * 2, qty),
+    alert(tick("LONG", orHigh, orLow, orHigh + rangePts * 2, qty) + scaleNote(qty),
          alert.freq_once_per_bar_close)
 else if allowed and shortBreak
     strategy.entry("S", strategy.short, qty=qty)
     tradesToday += 1
-    alert(tick("SHORT", orLow, orHigh, orLow - rangePts * 2, qty),
+    alert(tick("SHORT", orLow, orHigh, orLow - rangePts * 2, qty) + scaleNote(qty),
          alert.freq_once_per_bar_close)
 
 // Discipline alerts. The lock message is the one that matters most: it fires at the moment
@@ -196,8 +210,24 @@ if strategy.position_size != 0 and not na(riskPts)
     tgt    = isLong ? entryPx + riskPts * rMult : entryPx - riskPts * rMult
     id     = isLong ? "L" : "S"
 
+    // Whole contracts only: 10% of 4 is not a contract, so the runner rounds up to 1 and
+    // the core keeps at least 1. Below 2 contracts there is nothing to split.
+    runnerQty = math.max(1, math.round(qty * runnerPct))
+    coreQty   = qty - runnerQty
+
     if exitRule == "Opposite end only"
         strategy.exit(id + "x", id, stop=stopPx)
+    else if exitRule == "Scale 2R + runner"
+        if coreQty < 1
+            strategy.exit(id + "x", id, stop=stopPx, limit=tgt)
+        else
+            strategy.exit(id + "core", id, qty=coreQty, stop=stopPx, limit=tgt)
+            // Once the core is banked the runner can no longer lose: stop to breakeven,
+            // then trail a full R behind the best price.
+            scaled = math.abs(strategy.position_size) <= runnerQty
+            strategy.exit(id + "run", id, stop=scaled ? entryPx : stopPx,
+                 trail_points=scaled ? riskPts / syminfo.mintick : na,
+                 trail_offset=scaled ? riskPts / syminfo.mintick : na)
     else if exitRule == "Fixed 2R" or exitRule == "Fixed 1.5R"
         strategy.exit(id + "x", id, stop=stopPx, limit=tgt)
     else if exitRule == "Trail 1R after 1R"

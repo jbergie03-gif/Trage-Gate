@@ -1,6 +1,6 @@
 # Paper run summary — 1 sessions
 
-Setup: 2-minute opening range, exit `opposite_end`, 100K MES, $150 risk per trade.
+Setup: 2-minute opening range, exit `scale_2R`, 100K MES, $150 risk per trade.
 
 | setup | trades | net $ | wins |
 |---|---|---|---|

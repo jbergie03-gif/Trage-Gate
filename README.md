@@ -121,6 +121,7 @@ The exit rule is a flag, and it changes everything:
 |---|---|
 | `opposite_end` | hold until price breaks the other end of the range — your original description |
 | `fixed_2R` / `fixed_1.5R` | fixed multiple of the stop |
+| `scale_2R` | most of the position off at 2R, the rest left as a runner on a breakeven stop that trails 1R behind the high — `--runner-pct` sets the share |
 | `trail_after_1R` | trail by 1R once 1R in profit |
 | `session_end` | flat at the end of the session window |
 | `day_target` | size the target to finish a qualifying day in one trade, then stop |
@@ -129,6 +130,23 @@ The exit rule is a flag, and it changes everything:
 qualifying day.** $150 of risk doubled is $300 gross, and Apex's $300 minimum is net, so
 commissions leave it a few dollars short. A qualifying day needs about 2.17R, two winners, or
 a wider target.
+
+`scale_2R` is the attempt to have both: bank the trade at 2R, keep a runner for the trend day.
+Two things about it are worth knowing before trusting it. Runners are **whole contracts** — 10%
+of a 4-contract position is not a contract, so the runner rounds up to one and the core keeps
+one; below two contracts nothing splits and it behaves as `fixed_2R`. And on the pilot's 20 ORB
+sessions it lands between the two extremes rather than beating them:
+
+| exit | net | qualifying days |
+|---|---|---|
+| `opposite_end` | +$1,070 | 4 |
+| `scale_2R` (10% runner) | +$79 | 2 |
+| `fixed_2R` | -$258 | 0 |
+
+Same 16 trades, same 5 winners. Scaling out rescues most of what the flat 2R gives away, but on
+this sample the money was in the few big trend days, and taking 3 of 4 contracts off at 2R is
+exactly what cuts those short. One month of one regime — not a verdict, but not encouraging
+either.
 
 ### Comparing timeframes without fooling yourself
 
