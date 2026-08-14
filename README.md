@@ -148,6 +148,23 @@ this sample the money was in the few big trend days, and taking 3 of 4 contracts
 exactly what cuts those short. One month of one regime — not a verdict, but not encouraging
 either.
 
+### Re-entry, and why the stop is the weak point
+
+`--orb-reentry` allows exactly one re-entry after a stop-out: same direction, when price closes
+back through the level, still inside every daily lock. It exists because of a real session —
+14 Aug 2026, where the short was correct (ES fell 25 points by midday) and lost anyway, because
+the stop at the opposite end of a 6.75-point range was poked by half a point first. With the
+re-entry that day goes from -$140 to +$145.
+
+`--stop-buffer` widens the stop by N points instead. It does not work: the range gets poked
+either way, and the wider stop just buys fewer contracts and loses more per trade (-$1,061 at a
+2-point buffer). Across the 20 replay sessions the re-entry is close to noise (+$322 vs +$289),
+which is the honest reading — it rescued one day badly, and one day is not evidence.
+
+Because none of this is settled, the daily run keeps a **shadow**: the same session is replayed
+under the original hold-to-the-opposite-end rule into `reports/shadow/` and its own journal, so
+the week produces a comparison instead of a single path.
+
 ### Comparing timeframes without fooling yourself
 
 Both setups reportedly worked best on a 2-minute chart, so that is where to start — but two
