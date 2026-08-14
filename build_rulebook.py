@@ -233,7 +233,7 @@ def build():
          "is 5% of drawdown, so one trade mathematically cannot reach the threshold."),
         ("Flat before the close.",
          "Holding a position through market close forfeits the account and all balances. The app "
-         f"warns from {r['hard_flat_time_ct']} CT."),
+         f"warns from {rules.ct_to_pt(r['hard_flat_time_ct'])} PT."),
         ("No automation or algorithms.",
          "Rewards recognise human traders. This is why Trade Gate refuses to route orders, and it "
          "is the correct behaviour even though it is less convenient."),
@@ -293,8 +293,10 @@ def build():
         (f"{r['cooldown_minutes_after_loss']}-minute cooldown after any loss.",
          "The gate is closed during it. Re-entry inside fifteen minutes of a stop-out is emotion "
          "with a chart attached."),
-        (f"Session {r['session_start_ct']}&ndash;{r['session_end_ct']} CT only.",
-         f"Flat by {r['hard_flat_time_ct']} CT at the latest. Afternoon trading after a green "
+        (f"Session {rules.ct_to_pt(r['session_start_ct'])}&ndash;"
+         f"{rules.ct_to_pt(r['session_end_ct'])} PT only.",
+         f"Flat by {rules.ct_to_pt(r['hard_flat_time_ct'])} PT at the latest. Afternoon trading "
+         "after a green "
          "morning is how green mornings die."),
         ("Stops between "
          f"{r['min_stop_points']} and {r['max_stop_points']} points, minimum "
@@ -363,7 +365,8 @@ def build():
          "The journal is the only asset that compounds here. Tag the setup; after twenty trades it "
          "will tell you which one actually pays and which one you merely enjoy."),
         ("When the day is done, it is done.",
-         "Target hit, daily stop hit, two losses, three trades, or 11:30 CT &mdash; whichever comes "
+         "Target hit, daily stop hit, two losses, three trades, or 09:30 PT &mdash; whichever "
+         "comes "
          "first. Close the platform. This is the whole system."),
         ("At five qualifying days and $3,600, request the payout.",
          "Do not wait for a rounder number. Do not build a cushion first. Request it, then trade "

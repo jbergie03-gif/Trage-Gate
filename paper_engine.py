@@ -91,8 +91,8 @@ class Session:
     orb_retried: bool = False
 
     def log(self, ts: datetime, msg: str) -> None:
-        self.events.append(f"{ts.strftime('%H:%M')} {msg}")
-        print(f"  {ts.strftime('%H:%M')}  {msg}", flush=True)
+        self.events.append(f"{rules.pt(ts)} {msg}")
+        print(f"  {rules.pt(ts)}  {msg}", flush=True)
 
 
 class PaperEngine:
@@ -454,7 +454,7 @@ class PaperEngine:
             state = rules.evaluate(self.cfg, conn, when=bar.ts)
 
         s.trades.append({
-            "opened": p.opened.strftime("%H:%M"), "closed": bar.ts.strftime("%H:%M"),
+            "opened": rules.pt(p.opened), "closed": rules.pt(bar.ts),
             "setup": p.setup,
             "side": p.side, "contracts": p.contracts, "entry": round(p.entry, 2),
             "stop": round(p.stop, 2), "exit": round(price, 2), "points": round(points, 2),
@@ -530,6 +530,7 @@ def write_report(cfg: dict, s: Session) -> Path:
         f"{('%.2f' % s.or_low) if s.or_low else 'n/a'}"
         + (f"  ({s.or_high - s.or_low:.2f} pts)" if s.or_high and s.or_low else ""),
         f"- Day ended: {s.ended_by}",
+        "- All times Pacific.",
         "- One opening range break per day: the first one. If the Fib pullback appears "
         "afterwards it is the second trade, under the same day limits.",
         f"- Target was ${lim.daily_target:,.0f}, loss stop was ${lim.max_daily_loss:,.0f}",
@@ -745,6 +746,9 @@ def main() -> None:
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "
           f"${lim.daily_target:,.0f} · day stop ${lim.max_daily_loss:,.0f}\n"
+          f"Session {rules.ct_to_pt(cfg['my_rules']['session_start_ct'])}–"
+          f"{rules.ct_to_pt(cfg['my_rules']['session_end_ct'])} PT · flat by "
+          f"{rules.ct_to_pt(cfg['my_rules']['hard_flat_time_ct'])} PT · all times Pacific\n"
           f"Journal: {os.environ['TRADE_GATE_DB']} (simulated — never the real one)")
 
     if args.replay:

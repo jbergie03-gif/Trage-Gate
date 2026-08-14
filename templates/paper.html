@@ -120,9 +120,11 @@ async function tick(){
   if(!s.running){ document.getElementById("asof").textContent =
     "engine not running — start it with paper_engine.py"; return; }
 
-  // Show the bar's own clock, in CT, not the browser's timezone.
+  // Show the bar's own clock, in Pacific, not the browser's timezone.
   document.getElementById("asof").textContent =
-    "as of " + s.as_of.slice(11, 16) + " CT · " + (s.session_date || "");
+    "as of " + new Date(s.as_of).toLocaleTimeString("en-US",
+        {timeZone: "America/Los_Angeles", hour12: false, hour: "2-digit", minute: "2-digit"})
+    + " PT · " + (s.session_date || "");
 
   const d = s.day || {}, a = s.account || {};
   const pnl = d.realized || 0;

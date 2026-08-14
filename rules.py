@@ -25,6 +25,21 @@ CONFIG_PATH = BASE / "config.json"
 DB_PATH = Path(os.environ.get("TRADE_GATE_DB", BASE / "journal.db"))
 CT = ZoneInfo("America/Chicago")
 ET = ZoneInfo("America/New_York")
+# Everything Jonathan reads is Pacific. Exchange time still defines the session — the open is
+# an exchange event — so the rules are stored in CT and only ever displayed in PT.
+PT = ZoneInfo("America/Los_Angeles")
+
+
+def pt(ts: datetime) -> str:
+    """A timestamp as Jonathan's clock reads it."""
+    return ts.astimezone(PT).strftime("%H:%M")
+
+
+def ct_to_pt(hhmm: str, on: datetime | None = None) -> str:
+    """A stored CT rule time ("08:30") as Pacific ("06:30"), DST-correct for the day."""
+    h, m = (int(x) for x in hhmm.split(":"))
+    day = (on or datetime.now(CT)).astimezone(CT)
+    return day.replace(hour=h, minute=m, second=0, microsecond=0).astimezone(PT).strftime("%H:%M")
 
 
 def load_config() -> dict:
@@ -390,8 +405,8 @@ def evaluate(cfg: dict, conn: sqlite3.Connection, when: datetime | None = None) 
     t = when.timetz().replace(tzinfo=None)
     if not (_parse_ct(r["session_start_ct"]) <= t <= _parse_ct(r["session_end_ct"])):
         blocks.append(
-            f"Outside your session window {r['session_start_ct']}–{r['session_end_ct']} CT "
-            f"(now {t.strftime('%H:%M')} CT)."
+            f"Outside your session window {ct_to_pt(r['session_start_ct'], when)}–"
+            f"{ct_to_pt(r['session_end_ct'], when)} PT (now {pt(when)} PT)."
         )
     if st.realized > 0 and st.realized >= cap_today:
         blocks.append(
@@ -406,7 +421,8 @@ def evaluate(cfg: dict, conn: sqlite3.Connection, when: datetime | None = None) 
         )
     if st.open_trade and t >= _parse_ct(r["hard_flat_time_ct"]):
         warnings.append(
-            f"FLATTEN NOW — past {r['hard_flat_time_ct']} CT with trade #{st.open_trade['id']} open. "
+            f"FLATTEN NOW — past {ct_to_pt(r['hard_flat_time_ct'], when)} PT with trade "
+            f"#{st.open_trade['id']} open. "
             "Holding through the close forfeits the account and all balances."
         )
     if pstat["eligible"]:

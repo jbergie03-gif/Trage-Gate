@@ -27,7 +27,12 @@ Open <http://127.0.0.1:8765>. Everything is local: rules in `config.json`, journ
 4. Record the exit. P&L is stored net of commissions, because Apex judges a qualifying day on
    net profit.
 5. The gate closes for the day on: target hit, daily stop, two consecutive losses, three
-   trades, or the end of the session window. It reopens at the 6:00 PM ET reset.
+   trades, or the end of the session window. It reopens at the daily reset (6:00 PM ET = 3:00 PM PT).
+
+**Every time you read is Pacific.** The session is 6:30–9:30 AM PT with a hard flat at
+12:55 PM PT. The rules are stored in exchange time (Chicago) in `config.json` because the
+opening bell is an exchange event, and converted to PT for display; any other zone is labelled
+where it appears.
 
 Blocked and want through anyway? Overrides need a written reason of 15+ characters and are
 recorded permanently on the journal.

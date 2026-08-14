@@ -45,7 +45,7 @@ orMinutes  = input.int(2,  "Opening range length (minutes)", minval=1, group=grp
      tooltip="Run this on a 1-minute chart so the range is exact. On a 2-minute chart the range rounds up to whole bars.")
 lastEntry  = input.int(60, "No new entries after N minutes from open", minval=1, group=grpS)
 flatMin    = input.int(325,"Flatten everything N minutes after open", minval=1, group=grpS,
-     tooltip="325 = 14:55 CT from a 08:30 CT open. Apex forfeits accounts held through the close.")
+     tooltip="325 = 12:55 PT from a 06:30 PT open (14:55 / 08:30 exchange time). Apex forfeits accounts held through the close.")
 
 grpR = "Risk (the gate's rules)"
 riskUsd    = input.float(150, "Risk per trade ($)", minval=1, group=grpR,
@@ -239,7 +239,7 @@ if strategy.position_size != 0 and not na(riskPts)
         strategy.exit(id + "x", id, stop=stopPx)
 
 // Time-based flatten: the session window, then the hard flat.
-sessionOver = exitRule == "Session end" and minsFromOpen >= 180   // 11:30 CT
+sessionOver = exitRule == "Session end" and minsFromOpen >= 180   // 09:30 PT
 if strategy.position_size != 0 and (mustBeFlat or sessionOver)
     strategy.close_all(comment="flat")
 

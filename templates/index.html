@@ -405,7 +405,7 @@ document.getElementById('account').onchange = document.getElementById('instrumen
 
 setInterval(()=>{
   document.getElementById('clock').textContent =
-    new Date().toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour12:false}) + ' CT';
+    new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour12:false}) + ' PT';
 }, 1000);
 setInterval(load, 60000);
 load();
