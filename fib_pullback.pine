@@ -25,6 +25,10 @@
 // timeframes at the same pivot length is comparing two different setups. To hold the leg
 // definition constant while changing the chart, halve the pivot length when you double the
 // bar size (1-min/10 <-> 2-min/5).
+//
+// On a 15-minute chart the defaults are wrong in both directions: pivLen 10 spans 5 hours,
+// which is longer than the whole session, and a 15-minute leg is far bigger than 6 points.
+// Start at pivLen 3 (45 min a side), minLegPts 15, maxBars 16.
 // ============================================================================
 strategy("Fib pullback .618/.786 — backtest only", overlay=true,
      default_qty_type=strategy.fixed, default_qty_value=1,
@@ -34,9 +38,11 @@ strategy("Fib pullback .618/.786 — backtest only", overlay=true,
 
 grpL = "Leg definition"
 pivLen   = input.int(10, "Pivot length (bars each side)", minval=2, group=grpL,
-     tooltip="How the impulse leg is found. This single number changes everything — test several.")
-minLegPts= input.float(6, "Minimum leg size (points)", minval=0.25, group=grpL)
-maxBars  = input.int(120, "Abandon the setup after N bars", minval=5, group=grpL)
+     tooltip="How the impulse leg is found. This single number changes everything — test several. It is measured in BARS: 10 is 10 minutes on a 1-min chart and 2.5 hours on a 15-min chart. On 15-min start at 3.")
+minLegPts= input.float(6, "Minimum leg size (points)", minval=0.25, group=grpL,
+     tooltip="Scale this with the bar size — a 15-minute leg worth trading is nearer 15 points than 6.")
+maxBars  = input.int(120, "Abandon the setup after N bars", minval=5, group=grpL,
+     tooltip="Also bars, not minutes: 120 is two hours on a 1-min chart and two full days on a 15-min chart. On 15-min use about 16.")
 
 grpZ = "Entry zone"
 fibNear  = input.float(0.618, "Zone start", group=grpZ)

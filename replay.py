@@ -77,6 +77,47 @@ def parse_ts(v: str) -> datetime | None:
         return None
 
 
+def _tradingview(rows, type_col, ts_col, pnl_col, qty_col, sym_col) -> list[dict]:
+    """TradingView's List of Trades: one row per leg, entry and exit each carrying the
+    same P&L. Two collapses are needed or the gate sees four trades where you took one:
+    drop the entry rows, then merge the legs of a scaled trade (core + runner share an
+    entry) back into the single decision they were.
+    """
+    tnum = pick(list(rows[0].keys()), ["trade number", "trade #"])
+    entries: dict[str, datetime | None] = {}
+    for r in rows:
+        if (r.get(type_col) or "").lower().startswith("entry") and tnum:
+            entries[r[tnum]] = parse_ts(r.get(ts_col, "")) if ts_col else None
+
+    merged: dict[tuple, dict] = {}
+    order: list[tuple] = []
+    for r in rows:
+        if not (r.get(type_col) or "").lower().startswith("exit"):
+            continue
+        pnl = money(r.get(pnl_col))
+        if pnl is None:
+            continue
+        opened = entries.get(r.get(tnum, ""), None) if tnum else None
+        ts = opened or (parse_ts(r.get(ts_col, "")) if ts_col else None)
+        key = (ts, (r.get(sym_col) or "").strip() if sym_col else "")
+        if key not in merged:
+            merged[key] = {"ts": ts, "pnl": 0.0, "qty": 0.0, "symbol": key[1], "legs": 0}
+            order.append(key)
+        m = merged[key]
+        m["pnl"] += pnl
+        m["qty"] += (money(r.get(qty_col)) or 0.0) if qty_col else 0.0
+        m["legs"] += 1
+
+    out = [merged[k] for k in order]
+    scaled = sum(1 for t in out if t["legs"] > 1)
+    print(f"TradingView export: {len(out)} trades "
+          f"({scaled} of them scaled out in more than one piece, merged into one trade each)")
+    for t in out:
+        t.pop("legs")
+        t["pnl"] = round(t["pnl"], 2)
+    return out
+
+
 def load(path: str) -> list[dict]:
     with open(path, newline="", encoding="utf-8-sig") as fh:
         sample = fh.read(4096)
@@ -99,6 +140,11 @@ def load(path: str) -> list[dict]:
                  "Rename the column to 'pnl' and try again.")
     print(f"Columns detected — time: {ts_col or 'MISSING'}  P&L: {pnl_col}  "
           f"qty: {qty_col or 'n/a'}  symbol: {sym_col or 'n/a'}")
+
+    type_col = pick(header, ["type"])
+    if type_col and any((r.get(type_col) or "").lower().startswith(("entry", "exit"))
+                        for r in rows):
+        return _tradingview(rows, type_col, ts_col, pnl_col, qty_col, sym_col)
 
     out = []
     for r in rows:
