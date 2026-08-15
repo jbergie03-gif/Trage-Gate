@@ -60,6 +60,17 @@ maxConsecL = input.int(2,   "Max consecutive losses per day", minval=1, group=gr
 useGate    = input.bool(true,"Apply the daily locks", group=grpR,
      tooltip="Turn OFF to see what the same trades do without any discipline. That comparison is the whole point.")
 
+// Day filters. The 30-session MES export said the edge lives on trend days and the losses on
+// chop days, so these try to skip the chop. Each is off by default: turn ON exactly ONE at a
+// time, over years of data, or you are curve fitting.
+grpF = "Day filters — one at a time"
+maxQty     = input.int(6, "Contract cap", minval=1, group=grpF,
+     tooltip="Risk sizing hands you the most contracts when the range is narrowest, which is a chop day. This caps that.")
+minRangePts= input.float(0, "Skip if the opening range is narrower than (points)", minval=0, group=grpF,
+     tooltip="0 = off. The worst day in the sample had a 2.5-point range. Try 4 or 5.")
+withON     = input.bool(false, "Only take the break that agrees with the overnight direction", group=grpF,
+     tooltip="Overnight direction = the open versus the previous regular-session close.")
+
 grpX = "Exit rule — change this one at a time"
 exitRule = input.string("Scale 2R + runner", "Exit", group=grpX,
      options=["Opposite end only", "Fixed 2R", "Scale 2R + runner", "Trail 1R after 1R",
@@ -112,9 +123,17 @@ if useGate and (dayPnl >= dayTarget or dayPnl <= -dayStop or tradesToday >= maxT
 
 // ---------------------------------------------------------------- sizing
 rangePts = nz(orHigh) - nz(orLow)
-tradable = rangePts >= minStopPts and rangePts <= maxStopPts
+tradable = rangePts >= minStopPts and rangePts <= maxStopPts and rangePts >= minRangePts
 pointVal = syminfo.pointvalue
-qty      = math.max(1, math.round(riskUsd / math.max(rangePts * pointVal, 0.01)))
+qty      = math.min(maxQty, math.max(1, math.round(riskUsd / math.max(rangePts * pointVal, 0.01))))
+
+// Overnight direction: today's session open against yesterday's regular-session close.
+var float sessOpen = na
+if minsFromOpen == 0
+    sessOpen := open
+prevSessClose = ta.valuewhen(newDay, close[1], 0)
+onUp   = not na(sessOpen) and not na(prevSessClose) and sessOpen > prevSessClose
+onDown = not na(sessOpen) and not na(prevSessClose) and sessOpen < prevSessClose
 
 // ---------------------------------------------------------------- entries
 // The FIRST break of the range is the trade. A later re-break is a different setup on a
@@ -123,6 +142,8 @@ longBreak  = canEnter and not tookBreak and not na(orHigh) and high >= orHigh
 shortBreak = canEnter and not tookBreak and not na(orLow)  and low  <= orLow
 flat       = strategy.position_size == 0
 allowed    = flat and tradable and (not useGate or not dayLocked) and not mustBeFlat
+longOK     = allowed and (not withON or onUp)
+shortOK    = allowed and (not withON or onDown)
 
 // The alert text is the order ticket: everything needed to place it by hand, nothing to
 // work out in the moment. It is a notification to you — never wire it to a broker.
@@ -151,12 +172,12 @@ scaleNote(n) =>
 if (longBreak or shortBreak) and flat and barstate.isconfirmed
     tookBreak := true
 
-if allowed and longBreak
+if longOK and longBreak
     strategy.entry("L", strategy.long, qty=qty)
     tradesToday += 1
     alert(tick("LONG", orHigh, orLow, orHigh + rangePts * 2, qty) + scaleNote(qty),
          alert.freq_once_per_bar_close)
-else if allowed and shortBreak
+else if shortOK and shortBreak
     strategy.entry("S", strategy.short, qty=qty)
     tradesToday += 1
     alert(tick("SHORT", orLow, orHigh, orLow - rangePts * 2, qty) + scaleNote(qty),

@@ -89,6 +89,8 @@ class Session:
     orb_side: str = ""
     orb_stopped_out: bool = False
     orb_retried: bool = False
+    sess_open: float | None = None      # first print of the session
+    prev_close: float | None = None     # last print of the session before it
 
     def log(self, ts: datetime, msg: str) -> None:
         self.events.append(f"{rules.pt(ts)} {msg}")
@@ -100,7 +102,8 @@ class PaperEngine:
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
-                 orb_reentry: bool = False):
+                 orb_reentry: bool = False, max_contracts: int = 0,
+                 min_range_pts: float = 0.0, with_overnight: bool = False):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
@@ -111,12 +114,16 @@ class PaperEngine:
         self.runner_pct = runner_pct
         self.stop_buffer = stop_buffer
         self.orb_reentry = orb_reentry
+        self.max_contracts = max_contracts
+        self.min_range_pts = min_range_pts
+        self.with_overnight = with_overnight
         self.verbose = verbose
         self.write_live = write_live
         self.pos: Position | None = None
         self.session: Session | None = None
         self.day_key: str | None = None
         self.completed: list[Session] = []
+        self._last_close: float | None = None
 
     # ---------------------------------------------------------------- helpers
     @property
@@ -147,7 +154,7 @@ class PaperEngine:
         if self.session is not None:
             self._close_session()
         self.day_key = key
-        self.session = Session(date=key)
+        self.session = Session(date=key, prev_close=self._last_close)
         if self.verbose:
             print(f"\n=== {key} ===", flush=True)
 
@@ -172,6 +179,7 @@ class PaperEngine:
         s = self.session
         s.bars += 1
         s.bars_seen.append(bar)
+        self._last_close = bar.close
         mins = self._mins_from_open(bar.ts)
         if self.write_live:
             write_state(self.cfg, self, bar)
@@ -182,6 +190,8 @@ class PaperEngine:
 
         # Build the opening range from the first N minutes of the session.
         if 0 <= mins < self.or_minutes:
+            if s.sess_open is None:
+                s.sess_open = bar.open
             s.or_high = bar.high if s.or_high is None else max(s.or_high, bar.high)
             s.or_low = bar.low if s.or_low is None else min(s.or_low, bar.low)
             return
@@ -197,7 +207,7 @@ class PaperEngine:
                 side = "long"
             elif bar.low <= s.or_low:
                 side = "short"
-            if side is not None:
+            if side is not None and not self._day_filtered(bar, side):
                 s.took_break = True
                 s.orb_side = side
                 entry = s.or_high if side == "long" else s.or_low
@@ -222,6 +232,31 @@ class PaperEngine:
         # flat, and it shares the day's trade count and every lock with the ORB trade.
         if "fib" in self.setups and self.pos is None:
             self._check_fib(bar)
+
+    def _day_filtered(self, bar: Bar, side: str) -> bool:
+        """Day filters: skip the kind of day this setup loses on, before sizing sees it.
+
+        Both are off unless asked for. On the 30-session MES export the edge lived on three
+        trend days and the losses on chop, but three days is not enough to justify a default.
+        """
+        s = self.session
+        assert s is not None and s.or_high is not None and s.or_low is not None
+        width = s.or_high - s.or_low
+        if self.min_range_pts and width < self.min_range_pts:
+            s.log(bar.ts, f"SKIP ORB {side} — opening range {width:.2f} pts is under the "
+                          f"{self.min_range_pts:.2f} pt minimum (narrow range = chop day)")
+            s.skips.append(f"ORB {side}: opening range {width:.2f} pts, under the minimum")
+            s.took_break = True
+            return True
+        if self.with_overnight and s.sess_open is not None and s.prev_close is not None:
+            up = s.sess_open > s.prev_close
+            if (side == "long") != up:
+                s.log(bar.ts, f"SKIP ORB {side} — the break fights the overnight direction "
+                              f"(open {s.sess_open:.2f} vs prior close {s.prev_close:.2f})")
+                s.skips.append(f"ORB {side}: against the overnight direction")
+                s.took_break = True
+                return True
+        return False
 
     def _orb_stop(self, side: str) -> float:
         """Opposite end of the range, plus a buffer so a half-point poke is not the trade."""
@@ -319,6 +354,10 @@ class PaperEngine:
             target = target_override
 
         sizing = rules.size_trade(self.cfg, side, entry, stop, target)
+        if sizing["ok"] and self.max_contracts:
+            # Risk sizing is largest when the range is narrowest, which is a chop day. The cap
+            # is a blunt instrument against exactly that.
+            sizing["contracts"] = min(sizing["contracts"], self.max_contracts)
         if not sizing["ok"]:
             reason = sizing["errors"][0]
             if reason not in s.skips:
@@ -721,6 +760,12 @@ def main() -> None:
     ap.add_argument("--pivot-len", type=int, default=10,
                     help="bars each side of a Fib pivot — this one number moves everything")
     ap.add_argument("--min-leg", type=float, default=6.0, help="minimum Fib leg (points)")
+    ap.add_argument("--max-contracts", type=int, default=0,
+                    help="cap position size (0 = the risk formula decides)")
+    ap.add_argument("--min-range-pts", type=float, default=0.0,
+                    help="skip the day if the opening range is narrower than this")
+    ap.add_argument("--with-overnight", action="store_true",
+                    help="only take the break that agrees with the overnight direction")
     ap.add_argument("--stop-buffer", type=float, default=0.0,
                     help="points beyond the opposite end of the range for the ORB stop")
     ap.add_argument("--orb-reentry", action="store_true",
@@ -741,7 +786,8 @@ def main() -> None:
                       write_live=bool(args.live or args.live_view),
                       setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
                       runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
-                      orb_reentry=args.orb_reentry)
+                      orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
+                      min_range_pts=args.min_range_pts, with_overnight=args.with_overnight)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "
