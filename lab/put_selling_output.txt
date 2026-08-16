@@ -1,0 +1,34 @@
+Pricing model: Black-Scholes, VIX as the vol input, skew multiplier applied to reflect that out-of-the-money puts trade richer than at-the-money.
+Costs: $0.65/contract each way, $0.02/share of spread.
+Account: $2,500. Cash-secured means collateral = strike x 100.
+
+=== 0.10 delta, 10 DTE, skew x1.0 ===
+underlying  trades  win %  avg premium $  avg collateral $  premium % of collateral  return on collateral %/yr  worst trade $  worst % of collateral  worst trade = N weeks premium  trades/yr
+       SPY    1205   92.1          24.15           16677.0                    0.139                       1.48       -2739.07                   -9.2                          113.4       36.0
+
+=== 0.10 delta, 10 DTE, skew x1.3 ===
+underlying  trades  win %  avg premium $  avg collateral $  premium % of collateral  return on collateral %/yr  worst trade $  worst % of collateral  worst trade = N weeks premium  trades/yr
+       SPY    1205   97.7          32.15           16484.0                    0.192                       4.68       -2454.56                   -8.3                           76.3       36.0
+
+=== 0.10 delta, 10 DTE, skew x1.6 ===
+underlying  trades  win %  avg premium $  avg collateral $  premium % of collateral  return on collateral %/yr  worst trade $  worst % of collateral  worst trade = N weeks premium  trades/yr
+       SPY    1205   98.7          40.22           16296.0                    0.246                       7.31       -2174.07                   -7.4                           54.0       36.0
+
+=== Losing years, one contract, skew x1.3 (collateral ~$16,484) ===
+2007 $-19, 2015 $-135, 2018 $-825
+3 losing years out of 34; worst -825, median year +$468
+
+A $2,500 account cannot secure any of these: SPY's average strike needs $16,484 of cash per contract. See lab/put_screen.py for what it can secure.
+
+=== The 10%: worst single trades, one contract, skew x1.3 ===
+    opened   spot  strike  settle  IV %  premium $    P&L $  % of collateral
+2020-02-18 306.94  295.03  270.05  19.3      44.99 -2454.56             -8.3
+2022-06-07 392.39  368.04  346.81  31.2      96.12 -2028.31             -5.5
+2015-08-14 174.60  168.73  157.99  16.7      21.09 -1054.36             -6.2
+2025-03-24 566.12  540.30  529.25  22.7     100.41 -1005.48             -1.9
+2018-01-25 248.71  241.17  231.71  15.1      27.65  -919.79             -3.8
+2018-12-14 231.66  218.66  209.64  28.1      50.05  -853.75             -3.9
+2018-10-04 257.42  247.84  244.05  18.5      35.77  -345.22             -1.4
+2007-02-22 102.02   99.30   96.06  13.2       8.68  -316.62             -3.2
+
+SPY buy and hold over the same window: 10.88% CAGR, max drawdown -55.2%
