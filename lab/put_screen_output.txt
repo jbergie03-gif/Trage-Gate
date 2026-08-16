@@ -1,0 +1,37 @@
+
+=== Reachable with $2,500: 0.10 delta, 10 DTE, skew x1.3 ===
+symbol  spot $  vol %  10d 10Δ strike  collateral $  contracts on account  premium/trade $  premium % of collateral  income $/yr (36 rolls)  worst 10d fall %  loss if repeated $
+  MARA    9.20   87.2            7.37         737.0                     3             6.20                     0.84                   670.0             -43.8              -642.0
+  RIVN   15.36   67.4           12.90        1290.0                     1             8.57                     0.66                   308.0             -47.0              -467.0
+  LCID    6.22   82.4            5.04         504.0                     4             2.99                     0.59                   430.0             -39.7              -502.0
+  SOFI   18.29   59.4           15.66        1566.0                     1             9.04                     0.58                   326.0             -30.7              -291.0
+   WBD   27.99   50.7           24.50        2450.0                     1            12.49                     0.51                   450.0             -30.0              -478.0
+   AAL   14.83   51.9           12.94        1294.0                     1             5.56                     0.43                   200.0             -30.4              -256.0
+     F   14.37   35.0           13.10        1310.0                     1             2.64                     0.20                    95.0             -31.2              -319.0
+  KVUE   19.20   28.5           17.80        1780.0                     1             3.06                     0.17                   110.0             -14.7              -139.0
+  HBAN   17.91   29.2           16.57        1657.0                     1             2.82                     0.17                   101.0             -31.1              -420.0
+     T   24.89   23.9           23.35        2335.0                     1             3.53                     0.15                   127.0             -15.1              -218.0
+  VALE   13.63   31.6           12.53        1253.0                     1             1.86                     0.15                    67.0             -22.4              -193.0
+   NIO    4.52   63.7            3.83         383.0                     6             0.46                     0.12                    99.0             -38.3              -622.0
+  PLUG    2.32  103.6            1.79         179.0                    13             0.05                     0.03                    22.0             -44.7              -658.0
+  GRAB    3.62   45.9            3.21         321.0                     7            -0.89                    -0.28                  -223.0             -47.6              -923.0
+
+=== Out of reach (collateral above the account) ===
+symbol  spot $  collateral $
+   PFE   26.79        2514.0
+  SIRI   28.46        2550.0
+   SLV   58.48        5160.0
+   XLF   58.16        5551.0
+   XLE   61.91        5816.0
+   BAC   64.49        6036.0
+   EEM   66.61        6284.0
+  TQQQ   76.79        6483.0
+   GDX   89.97        8044.0
+    KO   87.71        8364.0
+  INTC  102.50        8560.0
+  CSCO  111.68       10338.0
+   IWM  305.09       28819.0
+   QQQ  731.07       68940.0
+   SPY  776.34       74257.0
+
+Best premium yield reachable: MARA at 0.84% of collateral per trade, $670/yr if nothing ever goes wrong — against $642 if its own worst 10-day fall (-44%) happens once while the put is open.
