@@ -103,7 +103,8 @@ class PaperEngine:
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
                  orb_reentry: bool = False, max_contracts: int = 0,
-                 min_range_pts: float = 0.0, with_overnight: bool = False):
+                 min_range_pts: float = 0.0, with_overnight: bool = False,
+                 cap_orb_stop: bool = False):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
@@ -117,6 +118,7 @@ class PaperEngine:
         self.max_contracts = max_contracts
         self.min_range_pts = min_range_pts
         self.with_overnight = with_overnight
+        self.cap_orb_stop = cap_orb_stop
         self.verbose = verbose
         self.write_live = write_live
         self.pos: Position | None = None
@@ -259,11 +261,21 @@ class PaperEngine:
         return False
 
     def _orb_stop(self, side: str) -> float:
-        """Opposite end of the range, plus a buffer so a half-point poke is not the trade."""
+        """Opposite end of the range, plus a buffer so a half-point poke is not the trade.
+
+        With cap_orb_stop the distance is clamped to max_stop_points instead of refusing the
+        trade for stop width alone: on the sample in lab/ORB3.md the wide-range days are the
+        ones the break follows through on, and the far end of a 20-point range is not a stop.
+        """
         s = self.session
         assert s is not None and s.or_high is not None and s.or_low is not None
-        return (s.or_low - self.stop_buffer if side == "long"
-                else s.or_high + self.stop_buffer)
+        far = (s.or_low - self.stop_buffer if side == "long"
+               else s.or_high + self.stop_buffer)
+        if not self.cap_orb_stop:
+            return far
+        entry = s.or_high if side == "long" else s.or_low
+        cap = float(self.r["max_stop_points"])
+        return max(far, entry - cap) if side == "long" else min(far, entry + cap)
 
     # ------------------------------------------------------------------- fib
     def _pivot(self, bars: list[Bar], high_side: bool) -> float | None:
@@ -772,6 +784,11 @@ def main() -> None:
                     help="allow one ORB re-entry, same direction, after a stop-out")
     ap.add_argument("--runner-pct", type=float, default=0.10,
                     help="share of the position left as a runner by scale_2R (min 1 contract)")
+    ap.add_argument("--max-stop-pts", type=float, default=0.0,
+                    help="override max_stop_points for this run (0 = use config.json)")
+    ap.add_argument("--cap-orb-stop", action="store_true",
+                    help="clamp the ORB stop to max_stop_points instead of skipping the "
+                         "trade when the opening range is wider than the cap")
     ap.add_argument("--reset", action="store_true", help="wipe the paper journal first")
     ap.add_argument("--live-view", action="store_true",
                     help="update paper_state.json every bar so /paper can be watched")
@@ -781,13 +798,16 @@ def main() -> None:
         Path(os.environ["TRADE_GATE_DB"]).unlink()
 
     cfg = rules.load_config()
+    if args.max_stop_pts:
+        cfg["my_rules"]["max_stop_points"] = args.max_stop_pts
     setups = tuple(s.strip().lower() for s in args.setups.split(",") if s.strip())
     eng = PaperEngine(cfg, args.or_minutes, args.exit_rule,
                       write_live=bool(args.live or args.live_view),
                       setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
                       runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
                       orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
-                      min_range_pts=args.min_range_pts, with_overnight=args.with_overnight)
+                      min_range_pts=args.min_range_pts, with_overnight=args.with_overnight,
+                      cap_orb_stop=args.cap_orb_stop)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "
