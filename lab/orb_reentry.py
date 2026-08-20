@@ -210,8 +210,12 @@ def report(res: pd.DataFrame, candle_min: int, target_r: float, cooldown_min: in
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--fetch", action="store_true", help="refresh the CSV first")
+    ap.add_argument("--fetch", action="store_true",
+                    help="refresh the ~30-day Yahoo CSV first (see lab/deep_history.py for years)")
     ap.add_argument("--csv", default=str(CSV))
+    ap.add_argument("--min-bars", type=int, default=350,
+                    help="skip sessions with fewer bars than this — a whole 06:25-12:55 session is "
+                         "~390, and a session with holes cannot be scored honestly")
     ap.add_argument("--candle", type=int, nargs="+", default=[3, 2],
                     help="opening range lengths to measure, in minutes")
     ap.add_argument("--target", type=float, default=1.5, help="target in R")
@@ -222,8 +226,15 @@ def main() -> None:
 
     if args.fetch:
         fetch()
-    df = pd.read_csv(args.csv, index_col=0, parse_dates=True).tz_convert(PT)
+    df = pd.read_csv(args.csv, index_col=0)
+    df.index = pd.to_datetime(df.index, utc=True).tz_convert(PT)   # the CSV spans DST changes
     df = df[["Open", "High", "Low", "Close"]].dropna()
+    per_day = df.groupby(df.index.date).size()
+    thin = per_day[per_day < args.min_bars]
+    if len(thin):
+        print(f"skipping {len(thin)} of {len(per_day)} sessions with gaps "
+              f"(under {args.min_bars} bars)")
+        df = df[~pd.Index(df.index.date).isin(thin.index)]
 
     for candle_min in args.candle:
         rows = [{"date": day, **r} for day, bars in df.groupby(df.index.date)
@@ -237,9 +248,9 @@ def main() -> None:
             print("\nPer session:")
             print(res.reindex(columns=cols).to_string(index=False))
 
-    print("\nSmall sample: the free feed serves about a month of 1-minute futures history, so "
-          "this is a few dozen sessions of one regime with simulated fills. It is a hint about "
-          "the rule, not evidence of an edge — the Strategy Tester on years of MES data is.")
+    print("\nSimulated fills on 1-minute bars, and a bar that covers both the stop and the target "
+          "is scored as the stop. Treat this as a hint about the rule, not proof of an edge — the "
+          "Strategy Tester on your own years of MES data is the check that counts.")
 
 
 if __name__ == "__main__":
