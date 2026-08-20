@@ -48,6 +48,7 @@ recorded permanently on the journal.
 | `test_rules.py` | 185 engine checks. `.venv/bin/python test_rules.py` |
 | `test_api.py` | Drives the live HTTP API end to end. Start the server first. |
 | `build_rulebook.py` | Regenerates `Trade_Gate_Rulebook.pdf` from `config.json`. |
+| `chart.py` | Draws the candlestick chart of a session's trades that the report embeds. |
 | `journal.db` | Your trades, overrides and payout records. **This is the file to back up.** |
 
 ## Adjusting the rules
@@ -93,6 +94,7 @@ sizes through the same engine the dashboard uses, and fills against the bar data
 credentials, reaches no broker and cannot place an order.
 
 ```bash
+# needs: flask pandas yfinance reportlab matplotlib
 .venv/bin/python paper_engine.py --live                       # delayed 1-minute feed
 .venv/bin/python paper_engine.py --replay es_1m.csv --speed 0 # a month of sessions in seconds
 .venv/bin/python paper_engine.py --replay es_1m.csv --live-view --speed 0.02
@@ -119,6 +121,12 @@ At the close of every session it writes `reports/session-YYYY-MM-DD.md`: every t
 entry, stop, exit, R and net P&L; the setups the rules refused and why; which rule ended the
 day; whether the day cleared Apex's $300 net minimum; and the running count of qualifying days
 and profit still needed for a payout. `reports/summary.md` stacks every session into one table.
+
+Alongside it goes `reports/chart-YYYY-MM-DD.png`: the session's 1-minute candles on Pacific
+time with the opening range, each entry (triangle), each exit (cross), the stop that was
+working while the trade was on (dashed), and the trade's net P&L and R. Drawn by `chart.py`,
+which needs `matplotlib` — without it the report is written as before, just without the
+picture. Bars outside 06:15–13:05 PT are left out so the trading day fills the frame.
 
 The exit rule is a flag, and it changes everything:
 

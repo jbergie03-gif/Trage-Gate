@@ -32,6 +32,7 @@ from zoneinfo import ZoneInfo
 BASE = Path(__file__).resolve().parent
 os.environ.setdefault("TRADE_GATE_DB", str(BASE / "paper_journal.db"))
 
+import chart  # noqa: E402
 import rules  # noqa: E402  (must follow the env var so the paper DB is used)
 
 CT = ZoneInfo("America/Chicago")
@@ -172,7 +173,7 @@ class PaperEngine:
             else:
                 s.ended_by = "no opening range break inside the session"
         self.completed.append(self.session)
-        write_report(self.cfg, self.session)
+        write_report(self.cfg, self.session, self.exit_rule)
 
     # ---------------------------------------------------------------- the loop
     def on_bar(self, bar: Bar) -> None:
@@ -506,6 +507,7 @@ class PaperEngine:
 
         s.trades.append({
             "opened": rules.pt(p.opened), "closed": rules.pt(bar.ts),
+            "opened_ts": p.opened.isoformat(), "closed_ts": bar.ts.isoformat(),
             "setup": p.setup,
             "side": p.side, "contracts": p.contracts, "entry": round(p.entry, 2),
             "stop": round(p.stop, 2), "exit": round(price, 2), "points": round(points, 2),
@@ -557,7 +559,7 @@ def write_state(cfg: dict, eng: PaperEngine, bar: Bar) -> None:
     }, indent=2, default=str))
 
 
-def write_report(cfg: dict, s: Session) -> Path:
+def write_report(cfg: dict, s: Session, exit_rule: str = "") -> Path:
     """The end-of-session summary: what happened, and what it means for a payout."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     with rules.db() as conn:
@@ -602,6 +604,15 @@ def write_report(cfg: dict, s: Session) -> Path:
         lines.append("")
     else:
         lines += ["## Trades", "", "None. A day with no setup is a normal day, not a failure.", ""]
+
+    chart_path = chart.write_chart(s, REPORT_DIR / f"chart-{s.date}.png", exit_rule)
+    if chart_path is not None:
+        lines += ["## The day on a chart", "",
+                  f"![Candlesticks for {s.date} with every trade marked]({chart_path.name})",
+                  "",
+                  "Entry is the triangle, exit the cross, the dashed line is the stop that was "
+                  "working while the trade was on; the dotted levels are the opening range.",
+                  ""]
 
     if s.skips:
         lines += ["## Setups the rules refused", ""]
