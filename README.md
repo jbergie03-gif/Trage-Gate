@@ -122,11 +122,16 @@ entry, stop, exit, R and net P&L; the setups the rules refused and why; which ru
 day; whether the day cleared Apex's $300 net minimum; and the running count of qualifying days
 and profit still needed for a payout. `reports/summary.md` stacks every session into one table.
 
-Alongside it goes `reports/chart-YYYY-MM-DD.png`: the session's 1-minute candles on Pacific
-time with the opening range, each entry (triangle), each exit (cross), the stop that was
-working while the trade was on (dashed), and the trade's net P&L and R. Drawn by `chart.py`,
-which needs `matplotlib` — without it the report is written as before, just without the
-picture. Bars outside 06:15–13:05 PT are left out so the trading day fills the frame.
+Alongside it goes `reports/chart-YYYY-MM-DD.png`: the session on Pacific time with the opening
+range, each entry (triangle), each exit (cross), the stop that was working while the trade was
+on (dashed), and the trade's net P&L and R. Drawn by `chart.py`, which needs `matplotlib` —
+without it the report is written as before, just without the picture. Bars outside
+06:15–13:05 PT are left out so the trading day fills the frame.
+
+The engine trades the 1-minute bars; the chart aggregates them into **5-minute candles**,
+because a 400-candle day is unreadable at the entries. `--chart-minutes` changes the candle
+size (`--chart-minutes 1` for the raw bars) and never changes a trade — the markers sit on the
+exact minute either way.
 
 The exit rule is a flag, and it changes everything:
 

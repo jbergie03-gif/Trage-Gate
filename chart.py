@@ -1,11 +1,15 @@
 """Candlestick chart of one paper session: the day's bars, the opening range, and every
 trade the rules took, drawn on Jonathan's clock (Pacific).
 
+The engine works on 1-minute bars; the chart aggregates them into 5-minute candles so the
+entries and exits are readable. The markers stay on their exact minute either way.
+
 Written by `paper_engine.py` next to the session report. Pure picture — it reads what the
 engine already recorded and never touches the journal.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,12 +25,45 @@ LEVEL = "#4a5568"
 # window are dropped unless that would leave nothing to draw.
 WINDOW = (time(6, 15), time(13, 5))
 
+CANDLE_MINUTES = 5
+
+
+@dataclass
+class _Candle:
+    """An aggregated candle. Same shape as the engine's `Bar`, built from several of them."""
+    ts: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+
 
 def _pt(ts: datetime) -> datetime:
     return ts.astimezone(PT)
 
 
-def write_chart(session, path: Path, exit_rule: str = "") -> Path | None:
+def aggregate(bars: list, minutes: int) -> list:
+    """1-minute bars into `minutes`-minute candles, on clock boundaries (06:30, 06:35, ...)."""
+    if minutes <= 1:
+        return list(bars)
+    out: list = []
+    bucket_start = None
+    for b in bars:
+        t = _pt(b.ts)
+        start = t.replace(minute=t.minute - t.minute % minutes, second=0, microsecond=0)
+        if bucket_start != start:
+            bucket_start = start
+            out.append(_Candle(start, b.open, b.high, b.low, b.close))
+        else:
+            c = out[-1]
+            c.high = max(c.high, b.high)
+            c.low = min(c.low, b.low)
+            c.close = b.close
+    return out
+
+
+def write_chart(session, path: Path, exit_rule: str = "",
+                minutes: int = CANDLE_MINUTES) -> Path | None:
     """Draw the session and save a PNG. Returns None if matplotlib is not installed."""
     try:
         import matplotlib
@@ -41,8 +78,9 @@ def write_chart(session, path: Path, exit_rule: str = "") -> Path | None:
     if not bars:
         return None
 
+    bars = aggregate(bars, minutes)
     times = [_pt(b.ts) for b in bars]
-    width = (1.0 / (24 * 60)) * 0.6          # a 1-minute candle body, in day units
+    width = (minutes / (24 * 60)) * 0.7      # candle body, in day units
 
     fig, ax = plt.subplots(figsize=(13, 6.5))
     for b, t in zip(bars, times):
@@ -96,7 +134,8 @@ def write_chart(session, path: Path, exit_rule: str = "") -> Path | None:
     title = f"Paper session {session.date} — net ${net:+,.2f}"
     if exit_rule:
         title += f" · exit {exit_rule}"
-    ax.set_title(title + "  (simulated fills, delayed 1-minute data)", fontsize=11)
+    ax.set_title(f"{title}  ({minutes}-minute candles, simulated fills on delayed "
+                 f"1-minute data)", fontsize=11)
     ax.set_ylabel("MES price")
     ax.set_xlabel("Pacific time")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=PT))
