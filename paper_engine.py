@@ -105,7 +105,7 @@ class PaperEngine:
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
                  orb_reentry: bool = False, max_contracts: int = 0,
                  min_range_pts: float = 0.0, with_overnight: bool = False,
-                 cap_orb_stop: bool = False):
+                 cap_orb_stop: bool = False, chart_minutes: int = chart.CANDLE_MINUTES):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
@@ -120,6 +120,7 @@ class PaperEngine:
         self.min_range_pts = min_range_pts
         self.with_overnight = with_overnight
         self.cap_orb_stop = cap_orb_stop
+        self.chart_minutes = chart_minutes
         self.verbose = verbose
         self.write_live = write_live
         self.pos: Position | None = None
@@ -173,7 +174,7 @@ class PaperEngine:
             else:
                 s.ended_by = "no opening range break inside the session"
         self.completed.append(self.session)
-        write_report(self.cfg, self.session, self.exit_rule)
+        write_report(self.cfg, self.session, self.exit_rule, self.chart_minutes)
 
     # ---------------------------------------------------------------- the loop
     def on_bar(self, bar: Bar) -> None:
@@ -559,7 +560,8 @@ def write_state(cfg: dict, eng: PaperEngine, bar: Bar) -> None:
     }, indent=2, default=str))
 
 
-def write_report(cfg: dict, s: Session, exit_rule: str = "") -> Path:
+def write_report(cfg: dict, s: Session, exit_rule: str = "",
+                 chart_minutes: int = chart.CANDLE_MINUTES) -> Path:
     """The end-of-session summary: what happened, and what it means for a payout."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     with rules.db() as conn:
@@ -605,10 +607,12 @@ def write_report(cfg: dict, s: Session, exit_rule: str = "") -> Path:
     else:
         lines += ["## Trades", "", "None. A day with no setup is a normal day, not a failure.", ""]
 
-    chart_path = chart.write_chart(s, REPORT_DIR / f"chart-{s.date}.png", exit_rule)
+    chart_path = chart.write_chart(s, REPORT_DIR / f"chart-{s.date}.png", exit_rule,
+                                   chart_minutes)
     if chart_path is not None:
         lines += ["## The day on a chart", "",
-                  f"![Candlesticks for {s.date} with every trade marked]({chart_path.name})",
+                  f"![{chart_minutes}-minute candles for {s.date} with every trade marked]"
+                  f"({chart_path.name})",
                   "",
                   "Entry is the triangle, exit the cross, the dashed line is the stop that was "
                   "working while the trade was on; the dotted levels are the opening range.",
@@ -800,6 +804,9 @@ def main() -> None:
     ap.add_argument("--cap-orb-stop", action="store_true",
                     help="clamp the ORB stop to max_stop_points instead of skipping the "
                          "trade when the opening range is wider than the cap")
+    ap.add_argument("--chart-minutes", type=int, default=chart.CANDLE_MINUTES,
+                    help="candle size for the session chart in minutes (the engine still "
+                         "trades the 1-minute bars)")
     ap.add_argument("--reset", action="store_true", help="wipe the paper journal first")
     ap.add_argument("--live-view", action="store_true",
                     help="update paper_state.json every bar so /paper can be watched")
@@ -818,7 +825,7 @@ def main() -> None:
                       runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
                       orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
                       min_range_pts=args.min_range_pts, with_overnight=args.with_overnight,
-                      cap_orb_stop=args.cap_orb_stop)
+                      cap_orb_stop=args.cap_orb_stop, chart_minutes=args.chart_minutes)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "
