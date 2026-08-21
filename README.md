@@ -132,8 +132,8 @@ on (dashed), and the trade's net P&L and R. Drawn by `chart.py`, which needs `ma
 without it the report is written as before, just without the picture. Bars outside
 06:15–13:05 PT are left out so the trading day fills the frame.
 
-The engine trades the 1-minute bars; the chart aggregates them into **5-minute candles**,
-because a 400-candle day is unreadable at the entries. `--chart-minutes` changes the candle
+The engine trades the 1-minute bars; the chart aggregates them into **3-minute candles**, to
+match the opening candle the ORB rule is measured on. `--chart-minutes` changes the candle
 size (`--chart-minutes 1` for the raw bars) and never changes a trade — the markers sit on the
 exact minute either way.
 

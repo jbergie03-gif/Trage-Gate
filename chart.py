@@ -25,7 +25,7 @@ LEVEL = "#4a5568"
 # window are dropped unless that would leave nothing to draw.
 WINDOW = (time(6, 15), time(13, 5))
 
-CANDLE_MINUTES = 5
+CANDLE_MINUTES = 3
 
 
 @dataclass
