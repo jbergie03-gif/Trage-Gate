@@ -143,7 +143,7 @@ The exit rule is a flag, and it changes everything:
 |---|---|
 | `opposite_end` | hold until price breaks the other end of the range — your original description |
 | `fixed_2R` / `fixed_1.5R` | fixed multiple of the stop |
-| `scale_2R` | most of the position off at 2R, the rest left as a runner on a breakeven stop that trails 1R behind the high — `--runner-pct` sets the share |
+| `scale_2R` / `scale_1.5R` | most of the position off at 2R (or 1.5R), the rest left as a runner on a breakeven stop that trails 1R behind the high — `--runner-pct` sets the share |
 | `trail_after_1R` | trail by 1R once 1R in profit |
 | `session_end` | flat at the end of the session window |
 | `day_target` | size the target to finish a qualifying day in one trade, then stop |
@@ -169,6 +169,11 @@ Same 16 trades, same 5 winners. Scaling out rescues most of what the flat 2R giv
 this sample the money was in the few big trend days, and taking 3 of 4 contracts off at 2R is
 exactly what cuts those short. One month of one regime — not a verdict, but not encouraging
 either.
+
+`scale_1.5R` is the same rule with a nearer target. On 178 traded days of deep history it wins
+more often (39% vs 33% on ORB trades) for smaller wins and lands within $6 of `scale_2R` on net,
+but it costs qualifying days — 5 instead of 14 — because $300 **net** needs about 2R. The
+trade-off in full: `lab/SCALE_1_5R.md`.
 
 ### Re-entry, and why the stop is the weak point
 

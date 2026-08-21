@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import time as time_mod
 from dataclasses import dataclass, field
@@ -39,6 +40,13 @@ CT = ZoneInfo("America/Chicago")
 ET = ZoneInfo("America/New_York")
 STATE_FILE = BASE / "paper_state.json"
 REPORT_DIR = Path(os.environ.get("TRADE_GATE_REPORTS", BASE / "reports"))
+
+
+# Scale-out rules, and where each one banks the core of the position. Everything else about
+# them is identical: the runner is left on a breakeven stop that trails an R behind the best
+# price, so the only choice being made here is how far the market has to go before that
+# happens. 1.5R takes the profit the pilot days kept handing back at 1.2-1.4R.
+SCALE_RULES = {"scale_2R": 2.0, "scale_1.5R": 1.5}
 
 
 @dataclass
@@ -63,7 +71,7 @@ class Position:
     setup: str = "orb"
     best: float = 0.0          # furthest favourable excursion, for the trailing exit
     trail: float = 0.0
-    scaled: bool = False       # the 2R scale-out has been taken; what is left is the runner
+    scaled: bool = False       # the scale-out has been taken; what is left is the runner
     banked: float = 0.0        # net P&L already realised on the scaled-out contracts
 
 
@@ -109,6 +117,7 @@ class PaperEngine:
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
+        self.scale_r = SCALE_RULES.get(exit_rule)
         self.setups = setups
         self.pivot_len = pivot_len
         self.min_leg_pts = min_leg_pts
@@ -358,8 +367,15 @@ class PaperEngine:
             else:
                 need = lim.daily_target + n * lim.commission_round_trip
                 tgt_pts = need / (n * lim.point_value)
+        elif self.scale_r:
+            tgt_pts = r_pts * self.scale_r
         else:
-            tgt_pts = r_pts * (1.5 if self.exit_rule == "fixed_1.5R" else 2.0)   # scale_2R: 2R
+            tgt_pts = r_pts * (1.5 if self.exit_rule == "fixed_1.5R" else 2.0)
+        # A 1.5R target lands exactly on the 1.5:1 gate, so round the distance out to the next
+        # tick: a target a hair short would be refused for being 1.49:1, and an off-grid price
+        # is not a price anyone can be filled at.
+        tick = float(self.cfg["instruments"][self.cfg["instrument"]]["tick_size"])
+        tgt_pts = math.ceil(tgt_pts / tick) * tick
         target = entry + tgt_pts if side == "long" else entry - tgt_pts
         # The Fib trade keeps its own structural target (the leg extreme) whatever the ORB
         # exit rule is: a 2R Fib target lets through the setups the 1.5:1 gate exists to
@@ -410,8 +426,9 @@ class PaperEngine:
         self.pos = Position(side=side, entry=entry, stop=stop, target=target,
                             contracts=sizing["contracts"], opened=bar.ts, trade_id=trade_id,
                             r_points=r_pts, setup=setup, best=entry, trail=stop)
-        if self.exit_rule == "scale_2R":
-            aim = f"target {target:.2f} (2R), then a runner on a breakeven trail"
+        if self.scale_r:
+            aim = (f"target {target:.2f} ({self.scale_r:g}R), "
+                   f"then a runner on a breakeven trail")
         elif self.exit_rule in ("fixed_2R", "fixed_1.5R", "day_target"):
             aim = f"target {target:.2f}"
         else:
@@ -434,7 +451,7 @@ class PaperEngine:
             self._exit(bar, p.trail, "stop")
             return
         target_rules = ("fixed_2R", "fixed_1.5R", "day_target")
-        if self.exit_rule == "scale_2R" and hit_target and not p.scaled:
+        if self.scale_r and hit_target and not p.scaled:
             self._scale_out(bar)
             return
         if (self.exit_rule in target_rules or p.setup == "FIB") and hit_target:
@@ -443,7 +460,7 @@ class PaperEngine:
 
         # The runner trails a full R behind the best price it has seen, from a stop already
         # at breakeven — so the worst it can do now is give back the runner's open profit.
-        if self.exit_rule == "scale_2R" and p.scaled:
+        if self.scale_r and p.scaled:
             p.best = max(p.best, bar.high) if long else min(p.best, bar.low)
             new_trail = p.best - p.r_points if long else p.best + p.r_points
             p.trail = max(p.trail, new_trail) if long else min(p.trail, new_trail)
@@ -462,7 +479,7 @@ class PaperEngine:
             self._exit(bar, bar.close, "session end")
 
     def _scale_out(self, bar: Bar) -> None:
-        """Bank most of the position at 2R and let a runner work on a breakeven stop.
+        """Bank most of the position at the scale target and let a runner work on a trail.
 
         Runners only exist in whole contracts: 10% of 4 contracts is not a contract, so the
         runner is rounded to at least one and the core to at least one. Below 2 contracts
@@ -487,7 +504,8 @@ class PaperEngine:
         p.scaled = True
         p.trail = p.entry          # the runner can no longer lose money
         p.best = bar.close
-        s.log(bar.ts, f"SCALE {core} out @ {p.target:.2f} (+2R, ${banked:+,.2f} banked) — "
+        s.log(bar.ts, f"SCALE {core} out @ {p.target:.2f} "
+                      f"(+{self.scale_r:g}R, ${banked:+,.2f} banked) — "
                       f"{runner} runner left, stop to breakeven")
 
     def _exit(self, bar: Bar, price: float, why: str) -> None:
@@ -513,7 +531,8 @@ class PaperEngine:
             "side": p.side, "contracts": p.contracts, "entry": round(p.entry, 2),
             "stop": round(p.stop, 2), "exit": round(price, 2), "points": round(points, 2),
             "r": round(points / p.r_points, 2) if p.r_points else 0.0,
-            "pnl": pnl, "why": (f"2R scale-out, runner {why}" if p.scaled else why),
+            "pnl": pnl,
+            "why": (f"{self.scale_r:g}R scale-out, runner {why}" if p.scaled else why),
         })
         if p.setup == "ORB" and why == "stop" and pnl < 0:
             s.orb_stopped_out = True
@@ -779,8 +798,8 @@ def main() -> None:
                     help="seconds to pause per bar in replay (0 = as fast as possible)")
     ap.add_argument("--or-minutes", type=int, default=2)
     ap.add_argument("--exit", dest="exit_rule", default="opposite_end",
-                    choices=["opposite_end", "fixed_2R", "fixed_1.5R", "scale_2R",
-                             "trail_after_1R", "session_end", "day_target"],
+                    choices=["opposite_end", "fixed_2R", "fixed_1.5R", "scale_1.5R",
+                             "scale_2R", "trail_after_1R", "session_end", "day_target"],
                     help="day_target sizes the target to finish a qualifying day in one trade")
     ap.add_argument("--setups", default="orb,fib",
                     help="which setups to run: orb, fib, or both (default both)")
@@ -798,7 +817,8 @@ def main() -> None:
     ap.add_argument("--orb-reentry", action="store_true",
                     help="allow one ORB re-entry, same direction, after a stop-out")
     ap.add_argument("--runner-pct", type=float, default=0.10,
-                    help="share of the position left as a runner by scale_2R (min 1 contract)")
+                    help="share of the position left as a runner by the scale rules "
+                         "(min 1 contract)")
     ap.add_argument("--max-stop-pts", type=float, default=0.0,
                     help="override max_stop_points for this run (0 = use config.json)")
     ap.add_argument("--cap-orb-stop", action="store_true",
