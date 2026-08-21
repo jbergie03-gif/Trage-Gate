@@ -24,6 +24,9 @@ import argparse
 import json
 import math
 import os
+import shutil
+import sqlite3
+import tempfile
 import time as time_mod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -47,6 +50,12 @@ REPORT_DIR = Path(os.environ.get("TRADE_GATE_REPORTS", BASE / "reports"))
 # price, so the only choice being made here is how far the market has to go before that
 # happens. 1.5R takes the profit the pilot days kept handing back at 1.2-1.4R.
 SCALE_RULES = {"scale_2R": 2.0, "scale_1.5R": 1.5}
+
+# Every exit rule the engine knows, in the order they are worth comparing: bank at a fixed
+# multiple, bank most of it and keep a runner, protect the entry once the trade has paid an R,
+# follow the price, or hold to structure.
+EXIT_RULES = ["opposite_end", "fixed_2R", "fixed_1.5R", "scale_1.5R", "scale_2R",
+              "be_1R", "trail_after_1R", "session_end", "day_target"]
 
 
 @dataclass
@@ -113,11 +122,13 @@ class PaperEngine:
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
                  orb_reentry: bool = False, max_contracts: int = 0,
                  min_range_pts: float = 0.0, with_overnight: bool = False,
-                 cap_orb_stop: bool = False, chart_minutes: int = chart.CANDLE_MINUTES):
+                 cap_orb_stop: bool = False, chart_minutes: int = chart.CANDLE_MINUTES,
+                 trail_r: float = 1.0):
         self.cfg = cfg
         self.or_minutes = or_minutes
         self.exit_rule = exit_rule
         self.scale_r = SCALE_RULES.get(exit_rule)
+        self.trail_r = trail_r
         self.setups = setups
         self.pivot_len = pivot_len
         self.min_leg_pts = min_leg_pts
@@ -429,6 +440,10 @@ class PaperEngine:
         if self.scale_r:
             aim = (f"target {target:.2f} ({self.scale_r:g}R), "
                    f"then a runner on a breakeven trail")
+        elif self.exit_rule == "be_1R":
+            aim = f"target {target:.2f}, stop to breakeven once 1R in profit"
+        elif self.exit_rule == "trail_after_1R":
+            aim = f"no target — a stop {self.trail_r:g}R behind the high once 1R in profit"
         elif self.exit_rule in ("fixed_2R", "fixed_1.5R", "day_target"):
             aim = f"target {target:.2f}"
         else:
@@ -450,7 +465,7 @@ class PaperEngine:
         if hit_stop:
             self._exit(bar, p.trail, "stop")
             return
-        target_rules = ("fixed_2R", "fixed_1.5R", "day_target")
+        target_rules = ("fixed_2R", "fixed_1.5R", "day_target", "be_1R")
         if self.scale_r and hit_target and not p.scaled:
             self._scale_out(bar)
             return
@@ -465,11 +480,19 @@ class PaperEngine:
             new_trail = p.best - p.r_points if long else p.best + p.r_points
             p.trail = max(p.trail, new_trail) if long else min(p.trail, new_trail)
 
-        if self.exit_rule == "trail_after_1R":
+        if self.exit_rule in ("trail_after_1R", "be_1R"):
             p.best = max(p.best, bar.high) if long else min(p.best, bar.low)
             moved = (p.best - p.entry) if long else (p.entry - p.best)
             if moved >= p.r_points:
-                new_trail = p.best - p.r_points if long else p.best + p.r_points
+                # `be_1R` parks the stop at entry and leaves it there: once the trade has been a
+                # winner by a full R it can no longer lose, which is the exact complaint about
+                # the days that ran 1.2-1.4R and came all the way back. `trail_after_1R` keeps
+                # following the best price, `--trail-r` behind it.
+                if self.exit_rule == "be_1R":
+                    new_trail = p.entry
+                else:
+                    give = self.trail_r * p.r_points
+                    new_trail = p.best - give if long else p.best + give
                 p.trail = max(p.trail, new_trail) if long else min(p.trail, new_trail)
 
         if self._flat_deadline(bar.ts):
@@ -665,6 +688,59 @@ def write_report(cfg: dict, s: Session, exit_rule: str = "",
     return path
 
 
+def compare_exits(cfg: dict, bars: list[Bar], live: PaperEngine,
+                  variants: list[str], **engine_kw) -> str:
+    """Re-run the same bars under other exit rules and return a table of what each kept.
+
+    Each variant runs against a *copy* of the journal with the replayed days removed, so it
+    sees the same account history — and therefore the same position sizing — as the live run
+    without ever writing to it. The reports and charts the variants produce are thrown away;
+    only their trades are kept, for the table appended to the session report.
+    """
+    global REPORT_DIR, STATE_FILE
+    dates = {s.date for s in live.completed}
+    real_db, real_reports, real_state = rules.DB_PATH, REPORT_DIR, STATE_FILE
+    rows: list[tuple[str, list[dict]]] = []
+    tmp = Path(tempfile.mkdtemp(prefix="exit-compare-"))
+    try:
+        for rule in variants:
+            db = tmp / f"{rule}.db"
+            shutil.copy(real_db, db)
+            with sqlite3.connect(db) as conn:
+                conn.executemany("DELETE FROM trades WHERE trade_date = ?",
+                                 [(d,) for d in dates])
+                conn.commit()
+            rules.DB_PATH = db
+            REPORT_DIR = tmp / rule
+            STATE_FILE = tmp / f"{rule}-state.json"
+            try:
+                eng = PaperEngine(cfg, live.or_minutes, rule, verbose=False, **engine_kw)
+                for bar in bars:
+                    eng.on_bar(bar)
+                eng._close_session()
+                rows.append((rule, [t for s in eng.completed for t in s.trades]))
+            finally:
+                rules.DB_PATH, REPORT_DIR, STATE_FILE = real_db, real_reports, real_state
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    live_trades = [t for s in live.completed for t in s.trades]
+    lines = ["## The same day under the other exit rules", "",
+             "| exit rule | trades | net $ | best trade R | what the rule did |",
+             "|---|---|---|---|---|"]
+    for rule, trades in [(live.exit_rule + " (live, the record)", live_trades)] + rows:
+        net = sum(t["pnl"] for t in trades)
+        best = max((t["r"] for t in trades), default=0.0)
+        why = "; ".join(sorted({t["why"] for t in trades})) or "no trade"
+        lines.append(f"| `{rule}` | {len(trades)} | {net:+,.2f} | {best:+.2f} | {why} |")
+    lines += ["",
+              "Only the live rule is in the journal. The rest are replays of the same bars in "
+              "throwaway journals seeded with the same account history, so the sizing matches; "
+              "one day of them means nothing on its own, but they stack up over the week.",
+              ""]
+    return "\n".join(lines)
+
+
 def write_summary(cfg: dict, sessions: list[Session], or_minutes: int, exit_rule: str) -> Path:
     """One file covering every session run, so the days stack into a record."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -798,8 +874,7 @@ def main() -> None:
                     help="seconds to pause per bar in replay (0 = as fast as possible)")
     ap.add_argument("--or-minutes", type=int, default=2)
     ap.add_argument("--exit", dest="exit_rule", default="opposite_end",
-                    choices=["opposite_end", "fixed_2R", "fixed_1.5R", "scale_1.5R",
-                             "scale_2R", "trail_after_1R", "session_end", "day_target"],
+                    choices=EXIT_RULES,
                     help="day_target sizes the target to finish a qualifying day in one trade")
     ap.add_argument("--setups", default="orb,fib",
                     help="which setups to run: orb, fib, or both (default both)")
@@ -819,6 +894,9 @@ def main() -> None:
     ap.add_argument("--runner-pct", type=float, default=0.10,
                     help="share of the position left as a runner by the scale rules "
                          "(min 1 contract)")
+    ap.add_argument("--trail-r", type=float, default=1.0,
+                    help="how many R behind the best price trail_after_1R follows "
+                         "(0.5 tightens it)")
     ap.add_argument("--max-stop-pts", type=float, default=0.0,
                     help="override max_stop_points for this run (0 = use config.json)")
     ap.add_argument("--cap-orb-stop", action="store_true",
@@ -827,6 +905,10 @@ def main() -> None:
     ap.add_argument("--chart-minutes", type=int, default=chart.CANDLE_MINUTES,
                     help="candle size for the session chart in minutes (the engine still "
                          "trades the 1-minute bars)")
+    ap.add_argument("--compare-exits", default="scale_2R,scale_1.5R,be_1R,trail_after_1R",
+                    help="exit rules to replay the same day under, for the table at the "
+                         "bottom of the report; they never touch the journal. An empty "
+                         "string turns the comparison off")
     ap.add_argument("--reset", action="store_true", help="wipe the paper journal first")
     ap.add_argument("--live-view", action="store_true",
                     help="update paper_state.json every bar so /paper can be watched")
@@ -839,13 +921,14 @@ def main() -> None:
     if args.max_stop_pts:
         cfg["my_rules"]["max_stop_points"] = args.max_stop_pts
     setups = tuple(s.strip().lower() for s in args.setups.split(",") if s.strip())
+    engine_kw = dict(setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
+                     runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
+                     orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
+                     min_range_pts=args.min_range_pts, with_overnight=args.with_overnight,
+                     cap_orb_stop=args.cap_orb_stop, chart_minutes=args.chart_minutes,
+                     trail_r=args.trail_r)
     eng = PaperEngine(cfg, args.or_minutes, args.exit_rule,
-                      write_live=bool(args.live or args.live_view),
-                      setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
-                      runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
-                      orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
-                      min_range_pts=args.min_range_pts, with_overnight=args.with_overnight,
-                      cap_orb_stop=args.cap_orb_stop, chart_minutes=args.chart_minutes)
+                      write_live=bool(args.live or args.live_view), **engine_kw)
     lim = rules.limits(cfg)
     print(f"Paper engine · {lim.account} {lim.instrument} · {args.or_minutes}-min opening range "
           f"· exit {args.exit_rule}\nRisk ${lim.risk_per_trade:,.0f}/trade · target "
@@ -855,6 +938,9 @@ def main() -> None:
           f"{rules.ct_to_pt(cfg['my_rules']['hard_flat_time_ct'])} PT · all times Pacific\n"
           f"Journal: {os.environ['TRADE_GATE_DB']} (simulated — never the real one)")
 
+    variants = [r for r in (x.strip() for x in args.compare_exits.split(","))
+                if r and r != args.exit_rule]
+
     if args.replay:
         for bar in replay_bars(args.replay):
             eng.on_bar(bar)
@@ -863,13 +949,20 @@ def main() -> None:
         eng.finish()
     elif args.today:
         # One post-close pass over the day: same rules, no waiting around.
-        n = 0
-        for bar in today_bars(args.symbol):
+        bars = list(today_bars(args.symbol))
+        for bar in bars:
             eng.on_bar(bar)
-            n += 1
-        if not n:
+        if not bars:
             print("No bars for today — market holiday, or the free feed is empty.", flush=True)
         eng.finish()
+        # The comparison replays the bars already in hand, so it costs no extra data and
+        # never reaches the journal: same day, same sizing, different exit.
+        if bars and variants and eng.completed:
+            table = compare_exits(cfg, bars, eng, variants, **engine_kw)
+            report = REPORT_DIR / f"session-{eng.completed[-1].date}.md"
+            if report.exists():
+                report.write_text(report.read_text().rstrip() + "\n\n" + table)
+            print("\n" + table, flush=True)
     elif args.live:
         print("Waiting for bars. Ctrl-C to stop.", flush=True)
         try:

@@ -144,7 +144,8 @@ The exit rule is a flag, and it changes everything:
 | `opposite_end` | hold until price breaks the other end of the range — your original description |
 | `fixed_2R` / `fixed_1.5R` | fixed multiple of the stop |
 | `scale_2R` / `scale_1.5R` | most of the position off at 2R (or 1.5R), the rest left as a runner on a breakeven stop that trails 1R behind the high — `--runner-pct` sets the share |
-| `trail_after_1R` | trail by 1R once 1R in profit |
+| `be_1R` | keep the 2R target, but move the stop to the entry once 1R is in profit — the trade can no longer lose |
+| `trail_after_1R` | no target: once 1R in profit, follow the high with a stop `--trail-r` R behind it (1R by default) |
 | `session_end` | flat at the end of the session window |
 | `day_target` | size the target to finish a qualifying day in one trade, then stop |
 
@@ -174,6 +175,31 @@ either.
 more often (39% vs 33% on ORB trades) for smaller wins and lands within $6 of `scale_2R` on net,
 but it costs qualifying days — 5 instead of 14 — because $300 **net** needs about 2R. The
 trade-off in full: `lab/SCALE_1_5R.md`.
+
+### All six exits on the deep history
+
+Same entries, same 178 traded days, only the exit changed:
+
+| exit | net | win % | qualifying days | net without its 3 best trades |
+|---|---|---|---|---|
+| `opposite_end` | +$8,070 | 20% | 27 | **−$1,562** |
+| `trail_after_1R` | +$1,983 | 44% | 18 | **−$60** |
+| `trail_after_1R --trail-r 0.5` | +$115 | 49% | 6 | −$1,477 |
+| `be_1R` | −$216 | 27% | 2 | −$1,095 |
+| `scale_2R` (live) | −$1,187 | 32% | 14 | −$2,421 |
+| `scale_1.5R` | −$1,192 | 38% | 5 | −$2,305 |
+
+The last column is the point: every rule that made money made it on a few trades, and the ones
+that bank at a fixed multiple are the ones that cut those trades off. `trail_after_1R` is the
+only rule that was profitable in both halves of the sample, with the smallest drawdown
+(−$1,572 against −$3,222 for the live rule). It is still a cash-index CFD, simulated fills and
+one regime — enough to reject a rule, not to trust one. Working, caveats and method:
+`lab/EXIT_RULES.md`.
+
+Every `--today` run replays the day it just recorded under the other rules and appends the
+comparison to the session report, so the choice keeps being tested on real days. Those replays
+use throwaway journals seeded from the real one — only the live rule ever writes to
+`paper_journal.db`. `--compare-exits ""` turns it off.
 
 ### Re-entry, and why the stop is the weak point
 
