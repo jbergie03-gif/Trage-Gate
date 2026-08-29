@@ -195,7 +195,7 @@ def orb_day(bars_ct: list[tuple[int, float, float, float, float]], **kw) -> pe.P
     cfg = rules.load_config()
     eng = pe.PaperEngine(cfg, or_minutes=3, exit_rule="scale_2R", verbose=False,
                          runner_pct=0.25, cap_orb_stop=True, **kw)
-    start = datetime(2026, 1, ORB_DAY, 8, 30, tzinfo=CT)
+    start = datetime(2026, 2, ORB_DAY, 8, 30, tzinfo=CT)   # February: January is the exit checks'
     for mins, o, h, lo, c in bars_ct:
         eng.on_bar(pe.Bar(ts=start + timedelta(minutes=mins), open=o, high=h, low=lo, close=c))
     return eng
@@ -242,6 +242,25 @@ eng = orb_day([(0, 100, 101, 99, 100), (1, 100, 101, 99, 100), (2, 100, 101, 99,
                (3, 100, 101.5, 100, 101.25), (4, 101, 106, 101, 105.5),
                (25, 105, 106, 100.5, 101)], orb_reentry=True)
 check("no re-entry after a winner", eng.session.orb_attempts, 1)
+close_out(eng)
+
+print("\n--- the loss streak locks the opening range, not the Fib pullback ---")
+
+# Both attempts stop out, then price offers the level a third time.
+STREAK = WHIPSAW + [(26, 101, 101.25, 98.5, 98.75),   # the re-entry stops out too
+                    (45, 100, 101.5, 100, 101.25)]    # a third touch, after two losses
+
+eng = orb_day(STREAK, orb_reentry=True)
+s = eng.session
+check("a third opening-range attempt is refused", s.orb_attempts, 2)
+check("and the reason given is the streak",
+      any("consecutive losses" in x for x in s.skips), True)
+check("but the day is not over — the Fib pullback can still trigger", s.ended_by, "")
+close_out(eng)
+
+eng = orb_day(STREAK, orb_reentry=True, setups=("orb",))
+check("with the Fib disabled the streak does end the day",
+      "consecutive losses" in eng.session.ended_by, True)
 close_out(eng)
 
 print("\n--- the daily comparison cannot touch the journal it compares against ---")

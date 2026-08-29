@@ -130,6 +130,21 @@ log_day(conn, "2026-08-13", -150.0)
 st = rules.evaluate(cfg, conn, when=mid)
 check_true("two consecutive losses locks the day", not st["can_trade"])
 check_true("consecutive-loss reason", any("consecutive losses" in b for b in st["blocks"]))
+check_true("the ORB is locked out by the streak",
+           not rules.evaluate(cfg, conn, when=mid, setup="ORB")["can_trade"])
+cooled = datetime(2026, 8, 13, 10, 5, tzinfo=CT)   # the losses are logged at 09:45 CT
+fib = rules.evaluate(cfg, conn, when=cooled, setup="FIB")
+check_true("the Fib pullback is not — it is exempt in config", fib["can_trade"], fib["blocks"])
+check_true("and the streak is still said out loud, as a warning",
+           any("consecutive losses" in w for w in fib["warnings"]))
+check_true("an ORB re-entry is not exempt",
+           not rules.evaluate(cfg, conn, when=cooled, setup="ORB2")["can_trade"])
+conn2 = fresh_db()
+log_day(conn2, "2026-08-13", -150.0)
+log_day(conn2, "2026-08-13", -150.0)
+log_day(conn2, "2026-08-13", -200.0)
+check_true("the exemption stops at the daily loss stop",
+           not rules.evaluate(cfg, conn2, when=cooled, setup="FIB")["can_trade"])
 
 conn = fresh_db()
 log_day(conn, "2026-08-13", -460.0)

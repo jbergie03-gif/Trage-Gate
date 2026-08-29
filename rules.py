@@ -342,8 +342,28 @@ def payout_status(lim: Limits, tot: dict, pay: dict) -> dict:
     }
 
 
-def evaluate(cfg: dict, conn: sqlite3.Connection, when: datetime | None = None) -> dict:
-    """Full current state plus every blocking rule that is currently tripped."""
+def streak_exempt(cfg: dict, setup: str) -> bool:
+    """Is this setup still allowed to trigger once the loss streak has closed the day?
+
+    The streak lock exists to stop the same failing setup being taken again. A setup that
+    only appears when the market brings it — the Fib pullback — is not that, so it stays
+    eligible inside every other limit: the trade cap, the daily loss stop, the cooldown,
+    the session window and the hard flat.
+    """
+    if not setup:
+        return False
+    exempt = cfg["my_rules"].get("loss_streak_exempt_setups", [])
+    name = setup.strip().upper()
+    return any(name.startswith(str(e).strip().upper()) for e in exempt)
+
+
+def evaluate(cfg: dict, conn: sqlite3.Connection, when: datetime | None = None,
+             setup: str = "") -> dict:
+    """Full current state plus every blocking rule that is currently tripped.
+
+    `setup` names the setup being staged, so a setup listed in `loss_streak_exempt_setups`
+    can still be taken after the day's loss streak. Left empty, nothing is exempt.
+    """
     r = cfg["my_rules"]
     pay = cfg["payout"]
     when = when or now_ct()
@@ -394,9 +414,16 @@ def evaluate(cfg: dict, conn: sqlite3.Connection, when: datetime | None = None) 
     if len(st.trades) >= r["max_trades_per_day"]:
         blocks.append(f"Trade count cap reached ({r['max_trades_per_day']} for the day).")
     if st.consecutive_losses >= r["max_consecutive_losses_per_day"]:
-        blocks.append(
-            f"{st.consecutive_losses} consecutive losses — the market is not offering your setup today."
-        )
+        streak = (f"{st.consecutive_losses} consecutive losses — the market is not offering "
+                  "your setup today.")
+        if streak_exempt(cfg, setup):
+            warnings.append(
+                f"{streak} {setup.strip().upper()} is exempt from the streak lock — taken only "
+                "if the market brings it, and only inside the trade cap, the daily loss stop "
+                "and the cooldown."
+            )
+        else:
+            blocks.append(streak)
     if st.last_loss_at is not None:
         cooldown_ends = st.last_loss_at + timedelta(minutes=r["cooldown_minutes_after_loss"])
         if when < cooldown_ends:

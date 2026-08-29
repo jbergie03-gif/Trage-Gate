@@ -187,6 +187,17 @@ class PaperEngine:
         if self.verbose:
             print(f"\n=== {key} ===", flush=True)
 
+    def _day_over_keys(self) -> tuple[str, ...]:
+        """Which blocks end the day, rather than only the setup that ran into them.
+
+        The loss streak stops the ORB from being taken again, but a setup the config exempts
+        (the Fib pullback) can still trigger, so the day is not over while one is enabled.
+        """
+        keys = ["TARGET HIT", "DAILY STOP", "Trade count", "CONSISTENCY"]
+        if not any(rules.streak_exempt(self.cfg, s.upper()) for s in self.setups):
+            keys.append("consecutive losses")
+        return tuple(keys)
+
     def _close_session(self) -> None:
         if self.session is None:
             return
@@ -415,7 +426,7 @@ class PaperEngine:
             return
 
         with rules.db() as conn:
-            state = rules.evaluate(self.cfg, conn, when=bar.ts)
+            state = rules.evaluate(self.cfg, conn, when=bar.ts, setup=setup)
             if state["blocks"]:
                 reason = state["blocks"][0]
                 # Cooldown messages count down every minute; key on the rule, not the text.
@@ -424,9 +435,7 @@ class PaperEngine:
                     s.seen_blocks.add(key)
                     s.skips.append(reason)
                     s.log(bar.ts, f"BLOCKED — {reason}")
-                if not s.ended_by and any(k in reason for k in
-                                          ("TARGET HIT", "DAILY STOP", "Trade count",
-                                           "consecutive losses", "CONSISTENCY")):
+                if not s.ended_by and any(k in reason for k in self._day_over_keys()):
                     s.ended_by = reason
                 return
 
@@ -577,8 +586,7 @@ class PaperEngine:
         self.pos = None
 
         for b in state["blocks"]:
-            if any(k in b for k in ("TARGET HIT", "DAILY STOP", "Trade count",
-                                    "consecutive losses", "CONSISTENCY")):
+            if any(k in b for k in self._day_over_keys()):
                 if not s.ended_by:
                     s.ended_by = b
                     s.log(bar.ts, f"DAY OVER — {b.split('.')[0]}")
