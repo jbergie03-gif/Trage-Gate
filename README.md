@@ -28,6 +28,10 @@ Open <http://127.0.0.1:8765>. Everything is local: rules in `config.json`, journ
    net profit.
 5. The gate closes for the day on: target hit, daily stop, two consecutive losses, three
    trades, or the end of the session window. It reopens at the daily reset (6:00 PM ET = 3:00 PM PT).
+   The two-loss lock stops further opening-range attempts, but the setups named in
+   `my_rules.loss_streak_exempt_setups` (the Fib pullback) stay eligible after it — they are
+   only taken if the market brings them, and only inside the trade cap, the daily loss stop,
+   the cooldown, the session window and the hard flat.
 
 **Every time you read is Pacific.** The session is 6:30–9:30 AM PT with a hard flat at
 12:55 PM PT. The rules are stored in exchange time (Chicago) in `config.json` because the
