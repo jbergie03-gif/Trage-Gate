@@ -178,6 +178,72 @@ check("the CLI offers every rule tested here",
       {"scale_2R", "scale_1.5R", "be_1R", "trail_after_1R"}
       <= set(pe.EXIT_RULES), True)
 
+print("\n--- the ORB re-entry repeats the first trade, at the same level ---")
+
+
+ORB_DAY = 0
+
+
+def orb_day(bars_ct: list[tuple[int, float, float, float, float]], **kw) -> pe.PaperEngine:
+    """Drive whole bars through on_bar so the setup logic, not just the exit, is under test.
+
+    Times are minutes past 08:30 CT (06:30 PT). Each call is its own trading day, so the
+    loss streak and trade count of one check cannot lock the day for the next.
+    """
+    global ORB_DAY
+    ORB_DAY += 1
+    cfg = rules.load_config()
+    eng = pe.PaperEngine(cfg, or_minutes=3, exit_rule="scale_2R", verbose=False,
+                         runner_pct=0.25, cap_orb_stop=True, **kw)
+    start = datetime(2026, 1, ORB_DAY, 8, 30, tzinfo=CT)
+    for mins, o, h, lo, c in bars_ct:
+        eng.on_bar(pe.Bar(ts=start + timedelta(minutes=mins), open=o, high=h, low=lo, close=c))
+    return eng
+
+
+def close_out(eng: pe.PaperEngine) -> None:
+    """An open trade left in the shared journal blocks every check after it."""
+    if eng.pos is not None:
+        eng._manage(pe.Bar(ts=eng.pos.opened + timedelta(minutes=5), open=100.0, high=100.0,
+                           low=0.0, close=0.0))
+
+
+# A 3-minute range of 99/101, a long break that stops out, then price back at the level
+# twice: once inside the 15-minute cooldown, once after it.
+WHIPSAW = [(0, 100, 101, 99, 100), (1, 100, 101, 99, 100), (2, 100, 101, 99, 100),
+           (3, 100, 101.5, 100, 101.25),      # break: long at 101, stop 99
+           (4, 101, 101.25, 98.5, 98.75),     # stopped out at 99
+           (6, 99, 101.5, 99, 101.25),        # back at the level inside the cooldown
+           (25, 100, 101.5, 100, 101.25)]     # back again, cooldown served
+
+eng = orb_day(WHIPSAW, orb_reentry=True)
+s = eng.session
+check("re-entry taken after the cooldown", eng.pos is not None, True)
+check("it is the second attempt at the same break", s.orb_attempts, 2)
+if eng.pos is not None:
+    check("same setup, labelled as the second attempt", eng.pos.setup, "ORB2")
+    check_close("same entry — the level, not wherever price is", eng.pos.entry, 101.0)
+    check_close("same stop as the first attempt", eng.pos.stop, 99.0)
+    check_close("same target as the first attempt", eng.pos.target, 105.0)
+check("a blocked attempt does not use up the re-entry",
+      any("Cooldown" in x for x in s.skips), True)
+close_out(eng)
+
+eng = orb_day(WHIPSAW)
+check("without --orb-reentry there is no second attempt", eng.session.orb_attempts, 1)
+close_out(eng)
+eng = orb_day(WHIPSAW, orb_reentry=True, orb_reentry_max=0)
+check("--orb-reentry-max 0 leaves the day's own limits in charge",
+      eng.session.orb_attempts, 2)
+close_out(eng)
+
+# The same day, but the first trade reached its target: nothing to re-enter.
+eng = orb_day([(0, 100, 101, 99, 100), (1, 100, 101, 99, 100), (2, 100, 101, 99, 100),
+               (3, 100, 101.5, 100, 101.25), (4, 101, 106, 101, 105.5),
+               (25, 105, 106, 100.5, 101)], orb_reentry=True)
+check("no re-entry after a winner", eng.session.orb_attempts, 1)
+close_out(eng)
+
 print("\n--- the daily comparison cannot touch the journal it compares against ---")
 csv = Path("data/SP500_1min_deep.csv")
 if csv.exists():

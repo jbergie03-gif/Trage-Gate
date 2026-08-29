@@ -203,11 +203,16 @@ use throwaway journals seeded from the real one — only the live rule ever writ
 
 ### Re-entry, and why the stop is the weak point
 
-`--orb-reentry` allows exactly one re-entry after a stop-out: same direction, when price closes
-back through the level, still inside every daily lock. It exists because of a real session —
-14 Aug 2026, where the short was correct (ES fell 25 points by midday) and lost anyway, because
-the stop at the opposite end of a 6.75-point range was poked by half a point first. With the
-re-entry that day goes from -$140 to +$145.
+`--orb-reentry` takes the same trade again after a stop-out: **the same entry level, the same stop
+and the same target as the first attempt**, the moment price trades back to that level, still
+inside every daily lock (3 trades, 2 consecutive losses, the 15-minute cooldown — `--orb-reentry-max
+N` caps the attempts further). It is a repeat of the trade, not a new one chased from wherever price
+is when the level is reclaimed. It exists because of a real session — 14 Aug 2026, where the short
+was correct (ES fell 25 points by midday) and lost anyway, because the stop at the opposite end of a
+6.75-point range was poked by half a point first. With the re-entry that day goes from -$140 to
++$145. Over 302 deep-history sessions the re-entries add +$3,083 on 85 trades (40% wins); over the
+last ten sessions they took 2 trades and lost both. `lab/ORB_REENTRY.md` has both, and neither is
+proof of an edge.
 
 `--stop-buffer` widens the stop by N points instead. It does not work: the range gets poked
 either way, and the wider stop just buys fewer contracts and loses more per trade (-$1,061 at a
