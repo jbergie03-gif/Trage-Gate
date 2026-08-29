@@ -12,8 +12,8 @@ Rules held constant: stop at the opposite end of the opening range clamped to 12
 risk, commissions in, the engine's 15-minute post-loss cooldown applied before the re-entry, a bar
 covering both stop and target scored as the stop.
 
-    close   trigger: a bar closes back through the broken level   (what --orb-reentry does today)
-    touch   trigger: price simply trades back through the level
+    close   trigger: a bar closes back through the broken level
+    touch   trigger: price simply trades back through the level   (what --orb-reentry does today)
 
 ## The first trade fails at least half the time
 
@@ -58,6 +58,30 @@ Two patterns hold across all six rows, which is what makes them worth acting on:
 And one that does not: the re-entry does not rescue the day. At best 37 of 75 stop-out days finished
 green, because a 1R loss plus a 1.5R win is barely more than flat after commissions.
 
+## What the engine does now (2026-08-29)
+
+Jonathan's rule, in his words: *"once the ORB fails you should be looking to reenter at the same
+entry point if the stock returns to that spot. Same entry and same exit on a second attempt."* The
+first `--orb-reentry` implementation did something else — it needed a **close** back through the
+level, filled at that close, and recomputed the stop from the opening range, so the second trade was
+a different trade with a different entry and a wider stop (13.25 points on 2026-08-28, which the 12
+point cap then rejected). It now stores the first attempt's entry, stop and target and repeats
+exactly those the moment price trades back to the level, however many times the day's own limits
+allow (`--orb-reentry-max N` caps it; 0 = only the 3-trade / 2-consecutive-loss / cooldown limits).
+That matches the `touch` column above, which is the better one in every cell.
+
+Replayed with the live rule set (3-min range, 12 pt cap, `scale_2R`, 25% runner):
+
+| Sample | No re-entry | Same-entry re-entry | Re-entry trades |
+|---|---|---|---|
+| 302 deep sessions, 2024-08 → 2026-08 | +$1,302 / 245 trades | **+$4,711** / 323 trades | 85, 40% wins, +$3,083 |
+| Last 10 sessions, 2026-08-17 → 08-28 | −$245 / 13 trades | **−$510** / 15 trades | 2, 0 wins, −$265 |
+
+The two-week sample says the opposite of the deep one, and it is the smaller sample of the two: the
+level was only revisited on 2 of 7 stop-out days, and both repeats lost. Ten sessions cannot
+separate a rule from luck either way. The deep block is the one worth weighing, with every caveat
+below still attached to it.
+
 ## What this does not say
 
 The re-entry does not create an edge — it clones a breakeven one. The cells where it looks strongly
@@ -75,7 +99,18 @@ If something is going to change, the first trade's expectancy is the target, not
 .venv/bin/python lab/orb_reentry.py --csv data/SP500_1min_deep.csv
 .venv/bin/python lab/orb_reentry.py --csv data/SP500_1min_deep.csv --target 1 --detail
 .venv/bin/python lab/orb_reentry.py                                   # the 30-day Yahoo feed
+
+# the engine's own rule, with and without the re-entry, into throwaway journals
+TRADE_GATE_DB=/tmp/a.db TRADE_GATE_REPORTS=/tmp/a .venv/bin/python paper_engine.py \
+  --replay data/SP500_1min_deep.csv --or-minutes 3 --cap-orb-stop --exit scale_2R --runner-pct 0.25
+TRADE_GATE_DB=/tmp/b.db TRADE_GATE_REPORTS=/tmp/b .venv/bin/python paper_engine.py \
+  --replay data/SP500_1min_deep.csv --or-minutes 3 --cap-orb-stop --exit scale_2R --runner-pct 0.25 \
+  --orb-reentry
 ```
+
+`lab/orb_reentry.py` stays as it is: its `touch` column already fills at the level with the first
+trade's stop, which is what the engine now does, and its `close` column is the record of what the
+engine used to do.
 
 `--min-bars` drops sessions the archive served with holes; the archive throttles hard, so 152 of the
 522 weekdays in the window came back complete. Re-running `deep_history.py` on another day fills

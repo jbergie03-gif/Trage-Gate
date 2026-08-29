@@ -106,7 +106,10 @@ class Session:
     fib_touched: bool = False
     orb_side: str = ""
     orb_stopped_out: bool = False
-    orb_retried: bool = False
+    orb_attempts: int = 0
+    orb_entry: float | None = None      # the level every attempt is taken at
+    orb_stop: float | None = None
+    orb_target: float | None = None
     sess_open: float | None = None      # first print of the session
     prev_close: float | None = None     # last print of the session before it
 
@@ -120,7 +123,8 @@ class PaperEngine:
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
-                 orb_reentry: bool = False, max_contracts: int = 0,
+                 orb_reentry: bool = False, orb_reentry_max: int = 0,
+                 max_contracts: int = 0,
                  min_range_pts: float = 0.0, with_overnight: bool = False,
                  cap_orb_stop: bool = False, chart_minutes: int = chart.CANDLE_MINUTES,
                  trail_r: float = 1.0):
@@ -136,6 +140,7 @@ class PaperEngine:
         self.runner_pct = runner_pct
         self.stop_buffer = stop_buffer
         self.orb_reentry = orb_reentry
+        self.orb_reentry_max = orb_reentry_max
         self.max_contracts = max_contracts
         self.min_range_pts = min_range_pts
         self.with_overnight = with_overnight
@@ -239,17 +244,20 @@ class PaperEngine:
                 self._try_entry(bar, side, entry, stop, "ORB")
                 return
 
-        # One re-entry, and only after a stop-out: the same break, in the same direction,
-        # once price closes back through the level. A whipsaw through a tight opening range
-        # is not the setup failing; a second failure is.
-        if (self.orb_reentry and s.orb_stopped_out and not s.orb_retried
-                and s.orb_side and self.pos is None):
-            lvl = s.or_high if s.orb_side == "long" else s.or_low
-            through = bar.close > lvl if s.orb_side == "long" else bar.close < lvl
-            if through:
-                s.orb_retried = True
-                self._try_entry(bar, s.orb_side, bar.close,
-                                self._orb_stop(s.orb_side), "ORB2")
+        # After a stop-out, the same trade again: price has to come back to the level the
+        # break was taken at, and the attempt is that level, that stop and that target — the
+        # first trade repeated, not a fresh one chased from wherever price happens to be. A
+        # blocked attempt (cooldown, trade count) costs nothing: the next touch tries again.
+        if (self.orb_reentry and s.orb_stopped_out and self.pos is None
+                and s.orb_side and s.orb_entry is not None
+                and (not self.orb_reentry_max
+                     or s.orb_attempts <= self.orb_reentry_max)):
+            lvl = s.orb_entry
+            back = bar.high >= lvl if s.orb_side == "long" else bar.low <= lvl
+            if back:
+                self._try_entry(bar, s.orb_side, lvl, s.orb_stop,
+                                f"ORB{s.orb_attempts + 1}",
+                                target_override=s.orb_target)
                 return
 
         # The Fib pullback is the second setup of the day: it only gets looked at while
@@ -437,6 +445,11 @@ class PaperEngine:
         self.pos = Position(side=side, entry=entry, stop=stop, target=target,
                             contracts=sizing["contracts"], opened=bar.ts, trade_id=trade_id,
                             r_points=r_pts, setup=setup, best=entry, trail=stop)
+        if setup.startswith("ORB"):
+            # What a re-entry has to repeat: the level, the stop and the target as filled.
+            s.orb_attempts += 1
+            s.orb_stopped_out = False
+            s.orb_entry, s.orb_stop, s.orb_target = entry, stop, target
         if self.scale_r:
             aim = (f"target {target:.2f} ({self.scale_r:g}R), "
                    f"then a runner on a breakeven trail")
@@ -557,7 +570,7 @@ class PaperEngine:
             "pnl": pnl,
             "why": (f"{self.scale_r:g}R scale-out, runner {why}" if p.scaled else why),
         })
-        if p.setup == "ORB" and why == "stop" and pnl < 0:
+        if p.setup.startswith("ORB") and why == "stop" and pnl < 0:
             s.orb_stopped_out = True
         s.log(bar.ts, f"EXIT {why} @ {price:.2f}  {points:+.2f} pts  ${pnl:+,.2f}  "
                       f"(day ${state['day']['realized']:+,.2f})")
@@ -890,7 +903,11 @@ def main() -> None:
     ap.add_argument("--stop-buffer", type=float, default=0.0,
                     help="points beyond the opposite end of the range for the ORB stop")
     ap.add_argument("--orb-reentry", action="store_true",
-                    help="allow one ORB re-entry, same direction, after a stop-out")
+                    help="after a stop-out, take the break again at the same level with the "
+                         "same stop and target when price comes back to it")
+    ap.add_argument("--orb-reentry-max", type=int, default=0,
+                    help="cap the re-entries per day (0 = as many as the day's own limits "
+                         "allow: 3 trades, 2 consecutive losses, the cooldown)")
     ap.add_argument("--runner-pct", type=float, default=0.10,
                     help="share of the position left as a runner by the scale rules "
                          "(min 1 contract)")
@@ -923,7 +940,8 @@ def main() -> None:
     setups = tuple(s.strip().lower() for s in args.setups.split(",") if s.strip())
     engine_kw = dict(setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
                      runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
-                     orb_reentry=args.orb_reentry, max_contracts=args.max_contracts,
+                     orb_reentry=args.orb_reentry, orb_reentry_max=args.orb_reentry_max,
+                     max_contracts=args.max_contracts,
                      min_range_pts=args.min_range_pts, with_overnight=args.with_overnight,
                      cap_orb_stop=args.cap_orb_stop, chart_minutes=args.chart_minutes,
                      trail_r=args.trail_r)
