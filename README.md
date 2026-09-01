@@ -109,16 +109,20 @@ credentials, reaches no broker and cannot place an order.
 .venv/bin/python paper_engine.py --replay es_1m.csv --speed 0 # a month of sessions in seconds
 .venv/bin/python paper_engine.py --replay es_1m.csv --live-view --speed 0.02
 .venv/bin/python paper_engine.py --replay es_1m.csv --setups orb        # ORB alone
-.venv/bin/python paper_engine.py --replay es_1m.csv --setups fib --pivot-len 5
+.venv/bin/python paper_engine.py --replay es_1m.csv --setups fib --fib-anchor pivots
 ```
 
 Both setups run by default and share one day: the opening range break is taken once, at the
 bell, and the Fib pullback is looked at afterwards only while flat — so the trade count, the
 cooldown and every daily lock apply to the pair, not to each setup separately.
 
-The Fib leg is defined by pivots (`--pivot-len` bars each side, `--min-leg` points), entry on
-a close back out of the .618 zone, stop beyond the leg origin. Change the pivot length and the
-results move a long way; that sensitivity is itself the finding.
+The Fib leg is the day's own range: once the session has run `--fib-anchor-minutes` (15) the
+leg is the day's high against its low, and its direction is whichever of the two printed later.
+Entry is a close back out of the .618 zone, the stop sits beyond the leg origin, and the target
+is the 1.272 extension past the leg extreme (`--fib-target`) — aiming at the extreme itself
+caps reward:risk at 1.62:1, under which almost nothing clears the 1.5:1 gate. The original
+pivot legs (`--fib-anchor pivots`, `--pivot-len` bars each side, `--min-leg` points) are still
+there; `lab/FIB_ANCHOR.md` has the measurement that chose between them.
 
 Paper trades are written to `paper_journal.db`, never to the real journal — that separation is
 the `TRADE_GATE_DB` environment variable, which the engine sets for itself.

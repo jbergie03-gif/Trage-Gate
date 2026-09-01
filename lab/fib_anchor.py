@@ -34,13 +34,13 @@ PY = BASE / ".venv" / "bin" / "python"
 COMMON = ["--or-minutes", "3", "--cap-orb-stop", "--exit", "scale_2R", "--runner-pct", "0.25"]
 
 VARIANTS = {
-    "pivots (live)": ["--fib-anchor", "pivots"],
-    "open15": ["--fib-anchor", "open15", "--fib-anchor-minutes", "15"],
-    "open15 fixed leg": ["--fib-anchor", "open15", "--fib-anchor-minutes", "15",
-                         "--fib-anchor-fixed"],
+    "pivots": ["--fib-anchor", "pivots"],
+    "open15 (live)": ["--fib-anchor", "open15", "--fib-anchor-minutes", "15"],
+    "open15 extending": ["--fib-anchor", "open15", "--fib-anchor-minutes", "15",
+                         "--fib-anchor-extend"],
     "open30": ["--fib-anchor", "open15", "--fib-anchor-minutes", "30"],
-    "open30 fixed leg": ["--fib-anchor", "open15", "--fib-anchor-minutes", "30",
-                         "--fib-anchor-fixed"],
+    "open30 extending": ["--fib-anchor", "open15", "--fib-anchor-minutes", "30",
+                         "--fib-anchor-extend"],
 }
 
 
@@ -72,6 +72,12 @@ def run(csv: Path, args: list[str], setups: str, min_rr: float | None = None) ->
             "SELECT trade_date, side, entry, stop, target, contracts, exit_price, pnl, setup "
             "FROM trades WHERE setup LIKE '%FIB%' AND pnl IS NOT NULL").fetchall()
         days = conn.execute("SELECT COUNT(DISTINCT trade_date) FROM trades").fetchone()[0]
+        # The whole day, ORB included: a Fib rule is only worth having if the day is better
+        # for it, and a Fib trade can spend the day's trade count or trip a lock.
+        all_net, qual = conn.execute(
+            "SELECT COALESCE(SUM(day_net), 0), COALESCE(SUM(day_net >= 300), 0) FROM "
+            "(SELECT SUM(pnl) AS day_net FROM trades WHERE pnl IS NOT NULL "
+            " GROUP BY trade_date)").fetchone()
         conn.close()
 
     nets = [r[7] for r in rows]
@@ -86,7 +92,7 @@ def run(csv: Path, args: list[str], setups: str, min_rr: float | None = None) ->
         "trades": len(rows), "wins": len(wins),
         "net": sum(nets), "avg_r": (sum(rs) / len(rs)) if rs else 0.0,
         "best": max(nets, default=0.0), "worst": min(nets, default=0.0),
-        "days": days,
+        "days": days, "all_net": all_net, "qualifying": qual,
     }
 
 
@@ -99,23 +105,32 @@ def main() -> None:
                          "as it would actually trade")
     ap.add_argument("--min-rr", type=float, default=None,
                     help="override the reward:risk gate for the run (live rule is 1.5)")
+    ap.add_argument("--fib-target", type=float, default=None,
+                    help="Fib target as a multiple of the leg: 1.0 is the leg extreme, "
+                         "1.272 the extension past it")
     args = ap.parse_args()
     csv = Path(args.csv)
     if not csv.exists():
         sys.exit(f"no history at {csv} — run lab/deep_history.py first")
 
     gate = args.min_rr if args.min_rr is not None else 1.5
-    print(f"{csv.name} · setups={args.setups} · min R:R {gate}\n")
+    target = args.fib_target if args.fib_target is not None else 1.272
+    print(f"{csv.name} · setups={args.setups} · min R:R {gate} · target {target}x leg\n")
     head = (f"{'anchor':<18}{'signals':>8}{'R:R no':>8}{'trades':>8}{'wins':>6}"
-            f"{'net $':>11}{'avg R':>8}{'best':>10}{'worst':>10}")
+            f"{'net $':>11}{'avg R':>8}{'day net $':>12}{'qual':>6}")
     print(head)
     print("-" * len(head))
     for name, extra in VARIANTS.items():
+        if args.fib_target is not None:
+            extra = [*extra, "--fib-target", str(args.fib_target)]
         st = run(csv, extra, args.setups, args.min_rr)
         print(f"{name:<18}{st['signals']:>8}{st['rr_refused']:>8}{st['trades']:>8}{st['wins']:>6}"
-              f"{st['net']:>11,.2f}{st['avg_r']:>8.2f}{st['best']:>10,.2f}{st['worst']:>10,.2f}")
-    print("\nSignals are setups the rule produced; 'R:R no' is how many the 1.5:1 gate refused; "
-          "trades are what the gate and the day's locks let through.")
+              f"{st['net']:>11,.2f}{st['avg_r']:>8.2f}{st['all_net']:>12,.2f}"
+              f"{st['qualifying']:>6}")
+    print("\nSignals are setups the rule produced; 'R:R no' is how many the reward:risk gate "
+          "refused; trades are what the gate and the day's locks let through. 'net $' and "
+          "'avg R' are the Fib trades alone; 'day net $' and 'qual' ($300+ days) are every "
+          "trade the day took.")
 
 
 if __name__ == "__main__":

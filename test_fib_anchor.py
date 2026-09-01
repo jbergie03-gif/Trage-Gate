@@ -96,8 +96,8 @@ feed(eng, [bar(0, 5100, 4900), bar(16, 5010, 5000)])
 check_close("high from the first bar is kept", eng.session.day_high, 5100)
 check_close("low from the first bar is kept", eng.session.day_low, 4900)
 
-print("\n--- a new extreme in the leg's direction extends the leg and re-arms the setup ---")
-eng = engine(fib_anchor_minutes=15)
+print("\n--- with --fib-anchor-extend a new extreme extends the leg and re-arms the setup ---")
+eng = engine(fib_anchor_minutes=15, fib_anchor_extend=True)
 feed(eng, [bar(0, 5005, 5000), bar(2, 5004, 4990), bar(12, 5020, 5010), bar(15, 5015, 5011)])
 eng.session.leg_dir = 0                      # an attempt was already taken off this leg
 feed(eng, [bar(20, 5030, 5025)])             # ... then the day makes a higher high
@@ -106,8 +106,8 @@ check_close("leg high follows the day to the new extreme", s.leg_high, 5030)
 check("the setup is armed again", s.leg_dir, 1)
 check("and the leg says so", s.fib_leg_note, "the day's range, extended to a new extreme")
 
-print("\n--- --fib-anchor-fixed keeps the leg the 15-minute one ---")
-eng = engine(fib_anchor_minutes=15, fib_anchor_extend=False)
+print("\n--- the live rule keeps the leg the 15-minute one ---")
+eng = engine(fib_anchor_minutes=15)
 feed(eng, [bar(0, 5005, 5000), bar(2, 5004, 4990), bar(12, 5020, 5010), bar(15, 5015, 5011)])
 eng.session.leg_dir = 0
 feed(eng, [bar(20, 5030, 5025)])
@@ -152,7 +152,20 @@ if taken:
     check("bought, because the leg is up", side, "long")
     check_close("entered at the close", entry, 5005)
     check_close("stop is just past the far end of the leg", stop, 4989.75)
-    check_close("target is the leg extreme", target, 5020)
+    # 30-point leg: 0.272 x 30 = 8.16, rounded up to the 0.25 tick grid
+    check_close("target is the 1.272 extension of the leg, on the tick grid", target, 5028.25)
+
+print("\n--- --fib-target 1.0 puts the target back on the leg extreme ---")
+eng = engine(fib_anchor_minutes=15, fib_target_ext=1.0)
+feed(eng, [bar(0, 5005, 5000), bar(2, 5004, 4990), bar(12, 5020, 5010), bar(15, 5015, 5011)])
+taken = []
+eng._try_entry = lambda b, side, entry, stop, setup, target_override=None: taken.append(
+    (side, entry, stop, target_override))
+for b in (bar(20, 5003, 5000, 5000),
+          pe.Bar(ts=OPEN + timedelta(minutes=21), open=5002, high=5006, low=5001, close=5005)):
+    eng.session.bars_seen.append(b)
+    eng._fib_signal(b)
+check_close("target is the leg extreme itself", taken[0][3] if taken else None, 5020)
 
 print("\n" + ("ALL FIB ANCHOR CHECKS PASSED" if not fails else f"{len(fails)} FAILURES: {fails}"))
 sys.exit(1 if fails else 0)
