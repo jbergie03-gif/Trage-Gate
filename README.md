@@ -84,6 +84,7 @@ files answer that separately.
 | `fib_pullback.pine` | The .618/.786 pullback, with the swing leg defined by pivots so it can actually be tested. |
 | `lab/deep_history.py` | Years of 1-minute S&P 500 bars from Dukascopy's open tick archive — no account, no key. Its `USA500IDXUSD` is the cash index CFD, not ES: absolute prices sit a basis below the future, but the opening-range widths match to about half a point, so R-based results carry over. This is what lifts the lab studies past the free feed's ~30-day wall. |
 | `lab/orb_reentry.py` | Measures the second ORB trade in the same direction after the first one stops out — trigger, cooldown, target and range length all swept, so the answer can be checked for robustness instead of read off one setting. Findings in `lab/ORB_REENTRY.md`. |
+| `lab/fib_anchor.py` | Compares where the Fib retracement is drawn from — confirmed swing pivots, or the day's own range once the session has run 15 or 30 minutes — through the real engine on the deep history, with the reward:risk gate as a dial. Findings in `lab/FIB_ANCHOR.md`. |
 | `replay.py` | Runs *your own* trade history through the gate. Two passes: what happened, and what would have happened with the daily locks applied. Reads Tradovate report exports, the Apex trade log, or TradingView's "List of Trades" CSV. |
 
 ```bash
@@ -92,6 +93,7 @@ files answer that separately.
 .venv/bin/python replay.py ~/Downloads/my_fills.csv --account 100K
 .venv/bin/python lab/deep_history.py --years 2          # -> data/SP500_1min_deep.csv
 .venv/bin/python lab/orb_reentry.py --csv data/SP500_1min_deep.csv
+.venv/bin/python lab/fib_anchor.py --setups orb,fib
 ```
 
 ### The paper engine, and the report it writes each session

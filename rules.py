@@ -20,7 +20,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 BASE = Path(__file__).resolve().parent
-CONFIG_PATH = BASE / "config.json"
+# TRADE_GATE_CONFIG points a study at a copy of the rules, the same way TRADE_GATE_DB points it
+# at a throwaway journal: a backtest that wants to vary a rule must never edit the live config.
+CONFIG_PATH = Path(os.environ.get("TRADE_GATE_CONFIG", BASE / "config.json"))
 # TRADE_GATE_DB keeps simulated runs out of the real journal. The paper engine sets it.
 DB_PATH = Path(os.environ.get("TRADE_GATE_DB", BASE / "journal.db"))
 CT = ZoneInfo("America/Chicago")
