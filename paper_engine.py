@@ -57,6 +57,12 @@ SCALE_RULES = {"scale_2R": 2.0, "scale_1.5R": 1.5}
 EXIT_RULES = ["opposite_end", "fixed_2R", "fixed_1.5R", "scale_1.5R", "scale_2R",
               "be_1R", "trail_after_1R", "session_end", "day_target"]
 
+# Which two points the Fib retracement is measured between.
+#   pivots   swing pivots confirmed pivot_len bars each side — many small legs a day
+#   open15   the opening bar against the day's extreme once the day has run
+#            fib_anchor_minutes, which is the leg Jonathan reads off the chart
+FIB_ANCHORS = ("pivots", "open15")
+
 
 @dataclass
 class Bar:
@@ -105,6 +111,14 @@ class Session:
     leg_dir: int = 0            # 1 = up leg (buy the pullback), -1 = down leg
     leg_bar: int = 0
     fib_touched: bool = False
+    # open15 anchor: the day's extremes so far, and which one printed later.
+    day_high: float | None = None
+    day_low: float | None = None
+    day_high_i: int = 0
+    day_low_i: int = 0
+    fib_anchored: bool = False
+    fib_anchor_dir: int = 0     # direction of the anchored leg, kept after an attempt
+    fib_leg_note: str = ""
     orb_side: str = ""
     orb_stopped_out: bool = False
     orb_attempts: int = 0
@@ -123,6 +137,8 @@ class PaperEngine:
     def __init__(self, cfg: dict, or_minutes: int, exit_rule: str, verbose: bool = True,
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
+                 fib_anchor: str = "pivots", fib_anchor_minutes: int = 15,
+                 fib_anchor_extend: bool = True,
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
                  orb_reentry: bool = False, orb_reentry_max: int = 0,
                  max_contracts: int = 0,
@@ -136,6 +152,9 @@ class PaperEngine:
         self.trail_r = trail_r
         self.setups = setups
         self.pivot_len = pivot_len
+        self.fib_anchor = fib_anchor
+        self.fib_anchor_minutes = fib_anchor_minutes
+        self.fib_anchor_extend = fib_anchor_extend
         self.min_leg_pts = min_leg_pts
         self.leg_max_bars = leg_max_bars
         self.runner_pct = runner_pct
@@ -220,6 +239,7 @@ class PaperEngine:
         s = self.session
         s.bars += 1
         s.bars_seen.append(bar)
+        self._track_day_range(bar)
         self._last_close = bar.close
         mins = self._mins_from_open(bar.ts)
         if self.write_live:
@@ -332,6 +352,13 @@ class PaperEngine:
         return mid.low if all(b.low >= mid.low for b in window) else None
 
     def _check_fib(self, bar: Bar) -> None:
+        if self.fib_anchor == "open15":
+            self._anchor_open15(bar)
+        else:
+            self._anchor_pivots(bar)
+        self._fib_signal(bar)
+
+    def _anchor_pivots(self, bar: Bar) -> None:
         s = self.session
         assert s is not None
         bars = s.bars_seen
@@ -344,10 +371,59 @@ class PaperEngine:
             s.leg_low = pl
             if s.leg_high is not None and s.leg_high > pl + self.min_leg_pts:
                 s.leg_dir, s.leg_bar, s.fib_touched = -1, i, False
+                s.fib_leg_note = "swing pivots"
         if ph is not None:
             s.leg_high = ph
             if s.leg_low is not None and ph > s.leg_low + self.min_leg_pts:
                 s.leg_dir, s.leg_bar, s.fib_touched = 1, i, False
+                s.fib_leg_note = "swing pivots"
+
+    def _anchor_open15(self, bar: Bar) -> None:
+        """The leg Jonathan reads off the chart: the opening bar against the day's extreme.
+
+        The day's high and low are tracked from the bell. Once the session has run
+        `fib_anchor_minutes` the leg is the two of them, and its direction is whichever extreme
+        printed *later* — a low made after the high is a down leg being retraced upwards. The
+        leg then follows the day: a new extreme in the leg's direction extends it and re-arms
+        the setup, because the retracement is now measured from the new end of the move.
+        """
+        s = self.session
+        assert s is not None
+        i = len(s.bars_seen)
+
+        if (self._mins_from_open(bar.ts) < self.fib_anchor_minutes
+                or s.day_high is None or s.day_low is None):
+            return
+
+        first = not s.fib_anchored
+        extended = (not first and self.fib_anchor_extend
+                    and ((s.fib_anchor_dir == 1 and s.day_high != s.leg_high)
+                         or (s.fib_anchor_dir == -1 and s.day_low != s.leg_low)))
+        if not (first or extended):
+            return
+        s.fib_anchored = True
+        s.leg_high, s.leg_low = s.day_high, s.day_low
+        s.leg_dir = 1 if s.day_high_i > s.day_low_i else -1
+        s.fib_anchor_dir = s.leg_dir
+        s.leg_bar, s.fib_touched = i, False
+        s.fib_leg_note = ("the day's range" if first
+                          else "the day's range, extended to a new extreme")
+
+    def _track_day_range(self, bar: Bar) -> None:
+        """The day's extremes, from the bell and through open trades — the open15 anchor is
+        measured off the whole session, not only the bars the engine was flat for."""
+        s = self.session
+        assert s is not None
+        i = len(s.bars_seen)
+        if s.day_high is None or bar.high > s.day_high:
+            s.day_high, s.day_high_i = bar.high, i
+        if s.day_low is None or bar.low < s.day_low:
+            s.day_low, s.day_low_i = bar.low, i
+
+    def _fib_signal(self, bar: Bar) -> None:
+        s = self.session
+        assert s is not None
+        i = len(s.bars_seen)
 
         if (s.leg_dir == 0 or s.leg_high is None or s.leg_low is None
                 or i - s.leg_bar > self.leg_max_bars):
@@ -377,6 +453,9 @@ class PaperEngine:
         # "Opposite end" for a pullback is the end of the leg it is retracing.
         leg_target = s.leg_high if side == "long" else s.leg_low
         s.leg_dir = 0        # one attempt per leg
+        s.log(bar.ts, f"FIB {side.upper()} setup — leg {s.leg_low:.2f}/{s.leg_high:.2f} "
+                      f"({leg:.2f} pts, {s.fib_leg_note or 'swing pivots'}), "
+                      f".618 at {near:.2f}")
         self._try_entry(bar, side, bar.close, stop, "FIB", target_override=leg_target)
 
     # ---------------------------------------------------------------- entries
@@ -915,6 +994,14 @@ def main() -> None:
     ap.add_argument("--pivot-len", type=int, default=10,
                     help="bars each side of a Fib pivot — this one number moves everything")
     ap.add_argument("--min-leg", type=float, default=6.0, help="minimum Fib leg (points)")
+    ap.add_argument("--fib-anchor", choices=FIB_ANCHORS, default="pivots",
+                    help="which two points the Fib is drawn between: swing pivots, or the "
+                         "day's range once the session has run --fib-anchor-minutes")
+    ap.add_argument("--fib-anchor-minutes", type=int, default=15,
+                    help="minutes of trading before the open15 anchor fixes the leg")
+    ap.add_argument("--fib-anchor-fixed", action="store_true",
+                    help="open15: keep the leg fixed at the anchor time instead of "
+                         "extending it to later day extremes")
     ap.add_argument("--max-contracts", type=int, default=0,
                     help="cap position size (0 = the risk formula decides)")
     ap.add_argument("--min-range-pts", type=float, default=0.0,
@@ -960,6 +1047,9 @@ def main() -> None:
         cfg["my_rules"]["max_stop_points"] = args.max_stop_pts
     setups = tuple(s.strip().lower() for s in args.setups.split(",") if s.strip())
     engine_kw = dict(setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
+                     fib_anchor=args.fib_anchor,
+                     fib_anchor_minutes=args.fib_anchor_minutes,
+                     fib_anchor_extend=not args.fib_anchor_fixed,
                      runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
                      orb_reentry=args.orb_reentry, orb_reentry_max=args.orb_reentry_max,
                      max_contracts=args.max_contracts,
