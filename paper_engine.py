@@ -82,6 +82,7 @@ class Position:
     trail: float = 0.0
     scaled: bool = False       # the scale-out has been taken; what is left is the runner
     banked: float = 0.0        # net P&L already realised on the scaled-out contracts
+    legs: list[dict] = field(default_factory=list)   # partial exits already taken
 
 
 @dataclass
@@ -549,6 +550,12 @@ class PaperEngine:
         p.scaled = True
         p.trail = p.entry          # the runner can no longer lose money
         p.best = bar.close
+        p.legs.append({
+            "kind": "scale", "ts": bar.ts.isoformat(), "at": rules.pt(bar.ts),
+            "price": round(p.target, 2), "contracts": core, "pnl": banked,
+            "points": round(points, 2),
+            "why": f"{self.scale_r:g}R scale-out",
+        })
         s.log(bar.ts, f"SCALE {core} out @ {p.target:.2f} "
                       f"(+{self.scale_r:g}R, ${banked:+,.2f} banked) — "
                       f"{runner} runner left, stop to breakeven")
@@ -578,6 +585,12 @@ class PaperEngine:
             "r": round(points / p.r_points, 2) if p.r_points else 0.0,
             "pnl": pnl,
             "why": (f"{self.scale_r:g}R scale-out, runner {why}" if p.scaled else why),
+            "legs": p.legs + [{
+                "kind": "exit", "ts": bar.ts.isoformat(), "at": rules.pt(bar.ts),
+                "price": round(price, 2), "contracts": p.contracts,
+                "pnl": round(gross - fees, 2), "points": round(points, 2),
+                "why": (f"runner {why}" if p.scaled else why),
+            }],
         })
         if p.setup.startswith("ORB") and why == "stop" and pnl < 0:
             s.orb_stopped_out = True

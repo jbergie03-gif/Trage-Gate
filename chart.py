@@ -21,6 +21,16 @@ SHORT = "#c62828"
 STOP = "#b0413e"
 LEVEL = "#4a5568"
 
+# Every exit gets its own marker, so a scale-out at the target is never confused with the
+# runner's stop on the way back.
+TARGET = "#1565c0"        # profit taken at the target
+RUNNER_WIN = "#1a7f37"    # runner closed in profit
+RUNNER_LOSS = "#c62828"   # runner closed at or below breakeven
+LEG_STYLE = {
+    "scale": ("P", TARGET),
+    "exit": ("X", None),      # coloured by its own result
+}
+
 # The picture is about the trading day, not the overnight drift: bars outside this Pacific
 # window are dropped unless that would leave nothing to draw.
 WINDOW = (time(6, 15), time(13, 5))
@@ -118,8 +128,7 @@ def write_chart(session, path: Path, exit_rule: str = "",
                 alpha=0.85, zorder=4)
         ax.plot([x0], [t["entry"]], marker=marker, color=colour, markersize=10,
                 markeredgecolor="white", markeredgewidth=0.8, zorder=5)
-        ax.plot([x1], [t["exit"]], marker="X", color=colour, markersize=10,
-                markeredgecolor="white", markeredgewidth=0.8, zorder=5)
+        _mark_exits(ax, mdates, t, x1, colour, day)
         ax.hlines(t["stop"], x0, x1, color=STOP, linewidth=0.9, linestyle="--",
                   alpha=0.8, zorder=4)
         ax.annotate(f"{t.get('setup', 'ORB')} {t['side']} {t['contracts']} @ {t['entry']:.2f}"
@@ -129,6 +138,8 @@ def write_chart(session, path: Path, exit_rule: str = "",
                     fontweight="bold", ha="left", zorder=6,
                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white",
                               edgecolor="none", alpha=0.75))
+
+    _exit_legend(ax, plt, session.trades)
 
     net = sum(t["pnl"] for t in session.trades)
     title = f"Paper session {session.date} — net ${net:+,.2f}"
@@ -147,6 +158,48 @@ def write_chart(session, path: Path, exit_rule: str = "",
     fig.savefig(path, dpi=130)
     plt.close(fig)
     return path
+
+
+def _mark_exits(ax, mdates, trade: dict, x_final: float, colour: str, day) -> None:
+    """Draw one marker per exit leg: the scale-out at the target and the runner's close are
+    separate events at different prices, and a single marker at the last one reads as if the
+    whole position came off there."""
+    legs = trade.get("legs") or [{"kind": "exit", "price": trade["exit"],
+                                  "contracts": trade["contracts"], "pnl": trade["pnl"],
+                                  "why": trade.get("why", ""), "ts": trade.get("closed_ts"),
+                                  "at": trade["closed"]}]
+    for leg in legs:
+        when = _mark_time(leg.get("ts"), leg.get("at", ""), day)
+        x = mdates.date2num(when) if when else x_final
+        shape, fixed = LEG_STYLE.get(leg["kind"], ("X", None))
+        if fixed:
+            leg_colour = fixed
+        else:
+            leg_colour = RUNNER_WIN if leg["pnl"] > 0 else RUNNER_LOSS
+        ax.plot([x], [leg["price"]], marker=shape, color=leg_colour, markersize=11,
+                markeredgecolor="white", markeredgewidth=0.8, zorder=6)
+        if len(legs) > 1:
+            ax.annotate(f"{leg['contracts']} {leg['why']} @ {leg['price']:.2f} "
+                        f"${leg['pnl']:+,.0f}",
+                        xy=(x, leg["price"]), xytext=(7, -4), textcoords="offset points",
+                        fontsize=7.5, color=leg_colour, ha="left", zorder=7,
+                        bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                                  edgecolor="none", alpha=0.75))
+
+
+def _exit_legend(ax, plt, trades: list) -> None:
+    """Only worth the space once a trade actually had more than one exit."""
+    if not any(len(t.get("legs") or []) > 1 for t in trades):
+        return
+    handles = [
+        plt.Line2D([], [], linestyle="none", marker="P", color=TARGET,
+                   markeredgecolor="white", markersize=9, label="profit taken at target"),
+        plt.Line2D([], [], linestyle="none", marker="X", color=RUNNER_WIN,
+                   markeredgecolor="white", markersize=9, label="runner closed in profit"),
+        plt.Line2D([], [], linestyle="none", marker="X", color=RUNNER_LOSS,
+                   markeredgecolor="white", markersize=9, label="runner stopped out"),
+    ]
+    ax.legend(handles=handles, loc="lower right", fontsize=8, framealpha=0.8)
 
 
 def _mark_time(iso: str | None, hhmm: str, day) -> datetime | None:
