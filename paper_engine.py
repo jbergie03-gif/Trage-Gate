@@ -137,8 +137,8 @@ class PaperEngine:
     def __init__(self, cfg: dict, or_minutes: int, exit_rule: str, verbose: bool = True,
                  write_live: bool = False, setups: tuple[str, ...] = ("orb", "fib"),
                  pivot_len: int = 10, min_leg_pts: float = 6.0, leg_max_bars: int = 120,
-                 fib_anchor: str = "pivots", fib_anchor_minutes: int = 15,
-                 fib_anchor_extend: bool = True,
+                 fib_anchor: str = "open15", fib_anchor_minutes: int = 15,
+                 fib_anchor_extend: bool = False, fib_target_ext: float = 1.272,
                  runner_pct: float = 0.10, stop_buffer: float = 0.0,
                  orb_reentry: bool = False, orb_reentry_max: int = 0,
                  max_contracts: int = 0,
@@ -155,6 +155,7 @@ class PaperEngine:
         self.fib_anchor = fib_anchor
         self.fib_anchor_minutes = fib_anchor_minutes
         self.fib_anchor_extend = fib_anchor_extend
+        self.fib_target_ext = fib_target_ext
         self.min_leg_pts = min_leg_pts
         self.leg_max_bars = leg_max_bars
         self.runner_pct = runner_pct
@@ -450,12 +451,20 @@ class PaperEngine:
                 return
             side, stop = "short", s.leg_high + 0.25
 
-        # "Opposite end" for a pullback is the end of the leg it is retracing.
-        leg_target = s.leg_high if side == "long" else s.leg_low
+        # "Opposite end" for a pullback is the end of the leg it is retracing. The 1.272
+        # extension aims past it instead: stopping at the leg's end caps reward:risk at
+        # 0.618/0.382 = 1.62:1 before any slippage, which is why so many setups died on the
+        # 1.5:1 gate. Reaching 1.272 of the leg is a claim that the move continues.
+        # An extension lands anywhere, so put it on the tick grid — a price off the grid is not
+        # a price anyone can be filled at — and round it away from entry, which is the side
+        # that makes the target harder to reach rather than easier.
+        tick = float(self.cfg["instruments"][self.cfg["instrument"]]["tick_size"])
+        reach = math.ceil(leg * (self.fib_target_ext - 1.0) / tick) * tick
+        leg_target = (s.leg_high + reach) if side == "long" else (s.leg_low - reach)
         s.leg_dir = 0        # one attempt per leg
         s.log(bar.ts, f"FIB {side.upper()} setup — leg {s.leg_low:.2f}/{s.leg_high:.2f} "
                       f"({leg:.2f} pts, {s.fib_leg_note or 'swing pivots'}), "
-                      f".618 at {near:.2f}")
+                      f".618 at {near:.2f}, target {leg_target:.2f}")
         self._try_entry(bar, side, bar.close, stop, "FIB", target_override=leg_target)
 
     # ---------------------------------------------------------------- entries
@@ -487,8 +496,8 @@ class PaperEngine:
         tick = float(self.cfg["instruments"][self.cfg["instrument"]]["tick_size"])
         tgt_pts = math.ceil(tgt_pts / tick) * tick
         target = entry + tgt_pts if side == "long" else entry - tgt_pts
-        # The Fib trade keeps its own structural target (the leg extreme) whatever the ORB
-        # exit rule is: a 2R Fib target lets through the setups the 1.5:1 gate exists to
+        # The Fib trade keeps its own structural target (a multiple of its leg) whatever the
+        # ORB exit rule is: a 2R Fib target lets through the setups the 1.5:1 gate exists to
         # refuse, and those lost money badly in the pilot.
         if target_override is not None:
             target = target_override
@@ -994,14 +1003,17 @@ def main() -> None:
     ap.add_argument("--pivot-len", type=int, default=10,
                     help="bars each side of a Fib pivot — this one number moves everything")
     ap.add_argument("--min-leg", type=float, default=6.0, help="minimum Fib leg (points)")
-    ap.add_argument("--fib-anchor", choices=FIB_ANCHORS, default="pivots",
-                    help="which two points the Fib is drawn between: swing pivots, or the "
-                         "day's range once the session has run --fib-anchor-minutes")
+    ap.add_argument("--fib-anchor", choices=FIB_ANCHORS, default="open15",
+                    help="which two points the Fib is drawn between: the day's range once the "
+                         "session has run --fib-anchor-minutes (the live rule), or swing pivots")
     ap.add_argument("--fib-anchor-minutes", type=int, default=15,
                     help="minutes of trading before the open15 anchor fixes the leg")
-    ap.add_argument("--fib-anchor-fixed", action="store_true",
-                    help="open15: keep the leg fixed at the anchor time instead of "
-                         "extending it to later day extremes")
+    ap.add_argument("--fib-anchor-extend", action="store_true",
+                    help="open15: let a later day extreme extend the leg and re-arm the "
+                         "setup, instead of keeping the leg fixed at the anchor time")
+    ap.add_argument("--fib-target", type=float, default=1.272, metavar="EXT",
+                    help="Fib target as a multiple of the leg: 1.272 is the extension past "
+                         "the leg extreme (the live rule), 1.0 is the extreme itself")
     ap.add_argument("--max-contracts", type=int, default=0,
                     help="cap position size (0 = the risk formula decides)")
     ap.add_argument("--min-range-pts", type=float, default=0.0,
@@ -1049,7 +1061,8 @@ def main() -> None:
     engine_kw = dict(setups=setups, pivot_len=args.pivot_len, min_leg_pts=args.min_leg,
                      fib_anchor=args.fib_anchor,
                      fib_anchor_minutes=args.fib_anchor_minutes,
-                     fib_anchor_extend=not args.fib_anchor_fixed,
+                     fib_anchor_extend=args.fib_anchor_extend,
+                     fib_target_ext=args.fib_target,
                      runner_pct=args.runner_pct, stop_buffer=args.stop_buffer,
                      orb_reentry=args.orb_reentry, orb_reentry_max=args.orb_reentry_max,
                      max_contracts=args.max_contracts,
