@@ -14,6 +14,6 @@ Setup: 3-minute opening range, exit `opposite_end`, 100K MES, $150 risk per trad
 
 | date | trades | net $ | qualifying | how the day ended |
 |---|---|---|---|---|
-| 2026-09-03 | 1 | -134.97 | — | the day's one opening range break was taken and closed |
+| 2026-09-04 | 1 | -134.97 | — | the day's one opening range break was taken and closed |
 
 Sample-size warning: this is a few weeks of one market regime on delayed data with simulated fills. It shows the rules working, not that the setup has an edge. Years of history in the Strategy Tester decide that.
