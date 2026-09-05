@@ -96,6 +96,16 @@ feed(eng, [bar(0, 5100, 4900), bar(16, 5010, 5000)])
 check_close("high from the first bar is kept", eng.session.day_high, 5100)
 check_close("low from the first bar is kept", eng.session.day_low, 4900)
 
+print("\n--- overnight bars are not the day: the range starts at the bell and ends at the flat ---")
+eng = engine(fib_anchor_minutes=15)
+feed(eng, [bar(-600, 5200, 5150),                    # the evening before, same trade date
+           bar(-30, 5005, 4800),                      # pre-market
+           bar(0, 5005, 5000), bar(2, 5020, 5010), bar(12, 5004, 4990), bar(15, 5000, 4995),
+           bar(400, 5300, 4700)])                     # after the hard flat
+check_close("high is the session's, not the overnight's", eng.session.day_high, 5020)
+check_close("low is the session's, not the pre-market's", eng.session.day_low, 4990)
+check_close("leg is drawn off the session only", eng.session.leg_high - eng.session.leg_low, 30)
+
 print("\n--- with --fib-anchor-extend a new extreme extends the leg and re-arms the setup ---")
 eng = engine(fib_anchor_minutes=15, fib_anchor_extend=True)
 feed(eng, [bar(0, 5005, 5000), bar(2, 5004, 4990), bar(12, 5020, 5010), bar(15, 5015, 5011)])

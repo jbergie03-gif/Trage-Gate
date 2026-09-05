@@ -415,6 +415,8 @@ class PaperEngine:
         measured off the whole session, not only the bars the engine was flat for."""
         s = self.session
         assert s is not None
+        if self._mins_from_open(bar.ts) < 0 or self._flat_deadline(bar.ts):
+            return
         i = len(s.bars_seen)
         if s.day_high is None or bar.high > s.day_high:
             s.day_high, s.day_high_i = bar.high, i
