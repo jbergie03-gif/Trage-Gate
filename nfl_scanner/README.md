@@ -74,7 +74,26 @@ Standard library only — no pip install, no virtualenv needed.
 
 ## Deploy
 
-On a fresh Ubuntu VPS:
+### HexOS / TrueNAS SCALE (free, uses hardware you already own)
+
+In the TrueNAS UI: **Apps → Discover Apps → ⋮ → Install via YAML**, paste
+[`hexos-compose.yaml`](hexos-compose.yaml), and change the volume's left-hand path to a
+real dataset on your pool (e.g. `/mnt/tank/apps/nfl-scanner`).
+
+Nothing to build. The container runs `python:3.12-slim` and downloads these scripts from
+this repo's `main` branch on every start, so restarting it is also how you update it. The
+SQLite database lives on the mounted dataset, which means it survives restarts, updates,
+and container deletion — and gets covered by your ZFS snapshots.
+
+```bash
+docker exec nfl-scanner python /app/report.py      # what it has found so far
+docker logs -f nfl-scanner                         # live; ALERT lines matter
+```
+
+Caveat: a home NAS is on your power and your ISP. A Sunday outage costs exactly the data
+this is collecting. Fine for answering "do gaps exist"; not what you'd trade from.
+
+### Ubuntu VPS
 
 ```bash
 git clone --depth 1 https://github.com/jbergie03-gif/Trage-Gate.git /tmp/tg
