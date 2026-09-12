@@ -1,0 +1,33 @@
+# Deploy the scanner on HexOS / TrueNAS SCALE.
+#
+# TrueNAS UI:  Apps -> Discover Apps -> (kebab menu) Install via YAML -> paste this.
+#
+# No image to build and nothing to pre-install: the container pulls the scripts
+# from this public repo on every start, so restarting it also updates it.
+# Point the volume at a real dataset on your pool before deploying.
+services:
+  nfl-scanner:
+    image: python:3.12-slim
+    container_name: nfl-scanner
+    restart: unless-stopped
+    environment:
+      SCANNER_DB: /data/nfl.sqlite
+      SCANNER_LOG: /data/scanner.log
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # left side = a dataset on your pool, e.g. /mnt/tank/apps/nfl-scanner
+      - /mnt/POOL/apps/nfl-scanner:/data
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        pip install --no-cache-dir --quiet tzdata
+        python -c "
+        import urllib.request
+        base = 'https://raw.githubusercontent.com/jbergie03-gif/Trage-Gate/main/nfl_scanner'
+        for f in ('venues.py', 'store.py', 'scan.py', 'report.py'):
+            urllib.request.urlretrieve(base + '/' + f, '/app/' + f)
+        "
+        exec python -u scan.py
