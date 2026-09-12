@@ -1,0 +1,20 @@
+[Unit]
+Description=NFL pick sheet and card collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nfl-cards
+Environment=PORT=80
+Environment=CARD_DATA_DIR=/opt/nfl-cards/data
+Environment=PICKSHEET=/opt/nfl-cards/index.html
+ExecStart=/usr/bin/python3 /opt/nfl-cards/server.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/nfl-cards/data
+
+[Install]
+WantedBy=multi-user.target

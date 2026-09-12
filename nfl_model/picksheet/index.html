@@ -56,7 +56,8 @@
   }
   .count { flex: 1; font-size: 13px; color: var(--dim); }
   .bar button { padding: 11px 14px; font-weight: 600; }
-  #copy { background: var(--pick); border-color: var(--pick); }
+  #send { background: var(--pick); border-color: var(--pick); }
+  #send[disabled] { opacity: .55; }
   #out {
     max-width: 640px; margin: 0 auto; white-space: pre-wrap;
     background: var(--card); border: 1px solid var(--line);
@@ -83,8 +84,9 @@
 
 <div class="note">
   Scoring: 1 point per correct side, 2 points per starred game, pushes void.
-  13 games, 15 points available. Devin's card is hidden until you copy yours,
-  so your picks are your own.
+  13 games, 15 points available. Devin's card is hidden until you send yours,
+  so your picks are your own. Re-sending before kickoff is fine — it files a new
+  revision with its own timestamp rather than overwriting the earlier card.
 </div>
 
 <pre id="out" class="hidden"></pre>
@@ -92,7 +94,8 @@
 <div class="bar">
   <div class="count" id="count"></div>
   <button id="reset">Reset</button>
-  <button id="copy">Copy my card</button>
+  <button id="copy">Copy</button>
+  <button id="send">Send to Devin</button>
 </div>
 
 <script>
@@ -114,6 +117,7 @@ const GAMES = [
 const TAKEN = "2026-09-12 15:48 PT";
 const KEY = "ats-2026-09-13";
 const MAX_STARS = 2;
+const SLATE = "2026-09-13";
 
 // spread is the home-team view: positive means the home team is favored.
 const line = (g, side) => {
@@ -184,23 +188,21 @@ document.getElementById("reset").onclick = () => {
   document.getElementById("out").classList.add("hidden");
 };
 
-document.getElementById("copy").onclick = async () => {
-  const lines = [`Jonathan's ATS card — Sunday 2026-09-13 (DK lines as of ${TAKEN})`];
+const asText = () => {
+  const lines = [`Jonathan's ATS card — Sunday ${SLATE} (DK lines as of ${TAKEN})`];
   GAMES.forEach((g, i) => {
     const p = state.picks[i];
     lines.push(p
       ? `${label(g, p)}${state.stars[i] ? "  (double weight)" : ""}`
       : `${g.away} @ ${g.home} — no pick`);
   });
-  const text = lines.join("\n");
-  try {
-    await navigator.clipboard.writeText(text);
-    alert("Card copied. Paste it to Devin.");
-  } catch (e) {
-    alert("Couldn't reach the clipboard — copy the text below instead.");
-  }
+  return lines.join("\n");
+};
+
+function reveal(header) {
   const out = document.getElementById("out");
-  out.textContent = text + "\n\n--- Devin's card, for comparison ---\n" +
+  out.textContent = header + "\n\n" + asText() +
+    "\n\n--- Devin's card, for comparison ---\n" +
     GAMES.map((g, i) => {
       const mine = state.picks[i] ? label(g, state.picks[i]) : "no pick";
       const same = state.picks[i] && label(g, state.picks[i]) === g.devin;
@@ -208,6 +210,51 @@ document.getElementById("copy").onclick = async () => {
     }).join("\n");
   out.classList.remove("hidden");
   out.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.getElementById("copy").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(asText());
+    reveal("Copied to your clipboard.");
+  } catch (e) {
+    reveal("Couldn't reach the clipboard — copy the text below instead.");
+  }
+};
+
+document.getElementById("send").onclick = async () => {
+  const btn = document.getElementById("send");
+  const picked = state.picks.filter(Boolean).length;
+  if (!picked) { alert("Pick at least one side first."); return; }
+  if (picked < GAMES.length &&
+      !confirm(`${GAMES.length - picked} game(s) still have no pick. Send anyway?`)) return;
+
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  const body = {
+    slate: SLATE,
+    who: "jonathan",
+    picks: GAMES.map((g, i) => ({
+      game: `${g.away}@${g.home}`,
+      side: state.picks[i] ? label(g, state.picks[i]) : "",
+      double: !!state.stars[i],
+    })).filter((p) => p.side),
+  };
+  try {
+    const res = await fetch("/card", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    reveal(`Sent ${data.picks} picks at ${data.submitted_at_pt} (revision ${data.revisions}). ` +
+           `Devin reads it from the server — nothing to paste.`);
+  } catch (e) {
+    // The card is still in localStorage, so nothing is lost by failing here.
+    reveal(`Couldn't reach the server (${e.message}). Copy the card below and paste it instead.`);
+  }
+  btn.disabled = false;
+  btn.textContent = "Send to Devin";
 };
 
 render();

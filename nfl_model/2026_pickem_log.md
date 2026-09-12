@@ -206,3 +206,42 @@ point in the direction of the side the card already holds.
 
 Every number in this section was read off the DraftKings feed at the
 timestamp above, not from memory.
+
+## Jonathan's ATS card — submitted 2026-09-12 16:22 PT
+
+Submitted through the pick sheet (`nfl_model/picksheet/index.html`) against the
+same DK snapshot, before kickoff, and before Devin's card was revealed to him.
+
+| Game | Jonathan | Devin | Agree |
+|---|---|---|:--:|
+| ATL @ PIT | PIT -6.0 | PIT -6.0 | yes |
+| BAL @ IND | **BAL -3.5** (double) | IND +3.5 | no |
+| BUF @ HOU | HOU +1.5 | HOU +1.5 | yes |
+| CHI @ CAR | CHI -3.0 | CAR +3.0 | no |
+| TB @ CIN | CIN -3.5 | TB +3.5 | no |
+| CLE @ JAX | **JAX -8.5** (double) | CLE +8.5 | no |
+| NO @ DET | DET -7.0 | DET -7.0 | yes |
+| NYJ @ TEN | TEN -1.5 | TEN -1.5 | yes |
+| ARI @ LAC | LAC -9.5 | **ARI +9.5** (double) | no |
+| GB @ MIN | MIN -2.5 | GB +2.5 | no |
+| MIA @ LV | LV -3.0 | **MIA +3.0** (double) | no |
+| WAS @ PHI | PHI -6.0 | PHI -6.0 | yes |
+| DAL @ NYG | DAL -3.0 | NYG +3.0 | no |
+
+Structure of the test: Jonathan took all 13 favorites. Devin took 8 dogs and
+5 favorites. Agreement on 5 games, split on 8. Both double-weight pairs are
+head-on — Jonathan's BAL -3.5 vs Devin's IND +3.5, and Jonathan's JAX -8.5 vs
+Devin's CLE +8.5 — while Devin's two doubles (ARI +9.5, MIA +3.0) are games
+Jonathan took the other way at single weight.
+
+So the slate answers one question: is the closing line accurate, or does it
+shade toward the popular side? Favorites covering is roughly a coin flip
+historically, and Devin's method measured 49.63% ATS over 3,030 games, so
+Jonathan's all-favorites card is the historically stronger side of this bet.
+Expected outcome for both cards is 6-7 of 13 sides. Neither is a prediction of
+profit.
+
+Scoring after the games: 1 point per correct side, 2 per double-weight game,
+pushes void, 15 points available each. Devin's model-only ATS card (ATL +6
+rather than the amended PIT -6) is scored separately so the model's own record
+stays honest.
