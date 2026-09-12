@@ -158,3 +158,51 @@ ATL was the only team in the 13-game slate with a QB listed Out.
 Amendments allowed until each game's kickoff, each with a timestamp and a
 stated reason. Next check: inactive lists, roughly 90 minutes before the
 10:00 PT window.
+
+### Correction 1, 2026-09-12 15:50 PT — CHI @ CAR side was written with the wrong sign
+
+Caught by snapshotting DraftKings directly (`nfl_model/odds_snapshot.py`) and
+reconciling against the card. **CHI is the 3-point favorite, not CAR.**
+DraftKings has CHI -3.0 / CAR +3.0, total 47.5, which agrees with nflverse's
+`spread_line` of -3 (negative = away team favored).
+
+The card printed the side as "CAR -3.0", which is not a real side. The model
+has CAR at -2.48 as the home team, i.e. CHI favored by 2.5 against a line of
+CHI -3.0 — a 0.5 pt edge toward the dog, which is under the 1 pt threshold.
+So the side is the home dog by the stated coin-flip convention:
+
+**CAR +3.0 (coin flip, no opinion)** — line CHI -3.0, model CHI -2.5.
+
+This is a notation fix, not a pick change: the side taken was and is the home
+team, and it remains logged as no opinion. The winner card was already correct
+(it picks CHI over CAR at 58.7%).
+
+### Line of record, from 2026-09-12 15:48 PT
+
+DraftKings is now the book of record, pulled from the-odds-api.com and stored
+with a Pacific timestamp in `nfl_model/data/odds_snapshots.csv`, so "the line
+moved" is checkable rather than asserted. FanDuel and BetMGM are captured in
+the same request.
+
+| Game | DK spread (home view) | DK total | Card line | Match |
+|---|---:|---:|---|---|
+| ATL @ PIT | PIT -6.0 | 40.5 | PIT -6.0 | yes |
+| BAL @ IND | BAL -3.5 | 47.5 | BAL -3.5 | yes |
+| BUF @ HOU | BUF -1.5 | 44.5 | BUF -1.5 | yes |
+| CHI @ CAR | CHI -3.0 | 47.5 | mislabelled, corrected above | corrected |
+| TB @ CIN | CIN -3.5 | 50.5 | CIN -3.5 | yes |
+| CLE @ JAX | JAX -8.5 | 39.5 | JAX -8.5 | yes |
+| NO @ DET | DET -7.0 | 49.5 | DET -7.0 | yes |
+| NYJ @ TEN | TEN -1.5 | 38.5 | TEN -1.5 | yes |
+| ARI @ LAC | LAC -9.5 | 47.5 | LAC -9.5 | yes |
+| GB @ MIN | MIN -2.5 | 46.5 | MIN -2.5 | yes |
+| MIA @ LV | LV -3.0 | 40.5 | LV -3.0 | yes |
+| WAS @ PHI | PHI -6.0 | 44.5 | PHI -6.0 | yes |
+| DAL @ NYG | DAL -3.0 | 48.5 | DAL -3.0 | yes |
+
+Book disagreement where it exists at this snapshot: FanDuel has ATL +5.5 vs
+DK's +6.0, and BetMGM has BAL -3.0 vs DK's -3.5. Both of those are half a
+point in the direction of the side the card already holds.
+
+Every number in this section was read off the DraftKings feed at the
+timestamp above, not from memory.

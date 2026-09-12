@@ -17,12 +17,13 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import zoneinfo
 
 HOST = "https://api.the-odds-api.com"
 SPORT = "americanfootball_nfl"
 BOOK_OF_RECORD = "draftkings"
 DEFAULT_BOOKS = ("draftkings", "fanduel", "betmgm")
-PACIFIC = datetime.timezone(datetime.timedelta(hours=-7), "PT")
+PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 
 TEAM_ABBR = {
     "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL",
@@ -63,7 +64,9 @@ def fetch(key, books):
 
 
 def rows(events, books):
-    """One row per (game, book). Spread is signed from the home team's view."""
+    """One row per (game, book), in nflverse's sign convention for spread_line:
+    positive means the home team is favored by that many points.
+    """
     out = []
     for ev in events:
         home, away = ev["home_team"], ev["away_team"]
@@ -135,7 +138,7 @@ def main():
             for b in bybook if b != BOOK_OF_RECORD and bybook[b]["spread_line"] is not None
         )
         print(f"{away}@{home:<8} {dk:>8} {tot:>7}   {others}")
-    print("\nSpread is from the home team's view: negative means the home team is favored.")
+    print("\nnflverse sign convention: positive means the home team is favored.")
 
 
 if __name__ == "__main__":
