@@ -78,6 +78,83 @@ are quoted wide but have **no open interest** — soft and untradeable, which is
 the usual trap. Anytime-TD props are the interesting cell: 1c wide with real
 open interest, so an accurate probability is worth something there.
 
+## 3. `td_model.py` — anytime-touchdown probabilities
+
+Follows the survey into the one cell that was both tight and liquid.
+
+```
+lambda = td_share(player) * expected_offensive_tds(team, game)
+P(1+ TD) = logistic(a + b * log lambda)      # Platt-recalibrated
+```
+
+`td_share` is a player's share of his team's offensive TDs, built from prior
+games only and shrunk toward a carries+targets usage prior, then normalized so a
+team's shares sum to one. `expected_offensive_tds` comes from the market's
+implied team total (`-0.653 + 0.1324 * implied_points`, fit pre-2018), because
+the game-level result above says the line already holds that information.
+
+```bash
+python3 td_model.py
+```
+
+Out of sample, 2018–2026, 38,241 player-games (actual 1+TD rate 0.217):
+
+| Predictor | Brier |
+|---|---|
+| Flat base rate | 0.17012 |
+| Player's season-to-date rate | 0.16438 |
+| Raw Poisson | 0.16069 |
+| **Calibrated model** | **0.15924** |
+
+So it beats the naive baselines — 6.4% Brier skill over the base rate — and its
+calibration buckets track actual rates to within ~2 points below 0.4.
+
+### But it does not beat the market. `live_props.py`
+
+```bash
+python3 live_props.py
+```
+
+Matching 225 of Kalshi's 331 quoted anytime-TD markets, week 1 2026:
+
+| Market price | n | Market mean | Model mean | Model − market |
+|---|---|---|---|---|
+| 0–10c | 50 | 0.067 | 0.124 | **+5.6c** |
+| 10–20c | 69 | 0.147 | 0.168 | +2.1c |
+| 20–30c | 47 | 0.242 | 0.200 | −4.2c |
+| 30–50c | 49 | 0.371 | 0.273 | −9.9c |
+| 50c+ | 10 | 0.559 | 0.354 | **−20.5c** |
+
+The disagreement is monotone in price, which is the signature of a model that is
+*flatter* than the market, not one that knows better: model σ = 0.083 against
+market σ = 0.134, correlation 0.78. The market spreads its probabilities twice
+as wide and is calibrated, so the "edges" at both tails are the model's missing
+information, not the market's error.
+
+Two concrete gaps explain most of it:
+
+- **No depth-chart or availability input.** The largest apparent edges land on
+  backups the market knows won't get carries — including backup quarterbacks who
+  are unlikely to take a snap. The model projects anyone with prior usage.
+- **Roster changes.** Week-1 usage priors come from last season's team, so a
+  player who changed roles or teams is mispriced by construction.
+
+**Conclusion: not tradeable as-is.** The next inputs that would plausibly close
+the gap are snap share, red-zone/goal-line carry share, and the nflverse injury
+feed — not more tuning of the current features.
+
+## 4. `week_log.py` — the public record
+
+```bash
+bash fetch_data.sh          # refresh the nflverse data first
+python3 week_log.py         # append the next slate's model-vs-line to the log
+python3 week_log.py --score # score completed games of the current season
+```
+
+Appends to `/home/ubuntu/ff/2026_Pickem_Log.md` before kickoff, so the hit rate
+is auditable rather than remembered. Game-level only by design: no player is
+named until inactives and depth charts are verified.
+
 ## Data sources
 
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
