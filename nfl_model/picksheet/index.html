@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATS pick sheet — Sunday 2026-09-13</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #181b22;
+    --line: #262b36;
+    --text: #e8eaed;
+    --dim: #9aa0ac;
+    --pick: #1f6feb;
+    --star: #d9a20b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px 12px 120px;
+    background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header { max-width: 640px; margin: 0 auto 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; }
+  main { max-width: 640px; margin: 0 auto; }
+  .game {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  }
+  .game.starred { border-color: var(--star); }
+  .meta {
+    display: flex; justify-content: space-between;
+    color: var(--dim); font-size: 12px; margin-bottom: 8px;
+  }
+  .row { display: flex; gap: 8px; align-items: stretch; }
+  button {
+    font: inherit; color: var(--text); cursor: pointer;
+    background: #20242e; border: 1px solid var(--line); border-radius: 9px;
+  }
+  .side {
+    flex: 1; padding: 12px 8px; text-align: left;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .side.on { background: var(--pick); border-color: var(--pick); }
+  .side .team { font-weight: 600; }
+  .side .num { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .side.on .num { color: #dbe7ff; }
+  .star { width: 46px; font-size: 19px; color: #3d444f; }
+  .star.on { color: var(--star); border-color: var(--star); }
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: #12151c; border-top: 1px solid var(--line);
+    padding: 10px 12px; display: flex; gap: 8px; align-items: center;
+    max-width: 640px; margin: 0 auto;
+  }
+  .count { flex: 1; font-size: 13px; color: var(--dim); }
+  .bar button { padding: 11px 14px; font-weight: 600; }
+  #copy { background: var(--pick); border-color: var(--pick); }
+  #out {
+    max-width: 640px; margin: 0 auto; white-space: pre-wrap;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px; font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .hidden { display: none; }
+  .note { max-width: 640px; margin: 14px auto 0; color: var(--dim); font-size: 12px; }
+  .devin { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .devin b { color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Against the spread — Sunday 2026-09-13</h1>
+  <div class="sub">
+    Tap a side to pick it. Star up to 2 games for double weight.
+    Lines are DraftKings, snapshotted <span id="taken"></span>.
+    Lines move, so re-check DK before kickoff on anything close.
+  </div>
+</header>
+
+<main id="games"></main>
+
+<div class="note">
+  Scoring: 1 point per correct side, 2 points per starred game, pushes void.
+  13 games, 15 points available. Devin's card is hidden until you copy yours,
+  so your picks are your own.
+</div>
+
+<pre id="out" class="hidden"></pre>
+
+<div class="bar">
+  <div class="count" id="count"></div>
+  <button id="reset">Reset</button>
+  <button id="copy">Copy my card</button>
+</div>
+
+<script>
+const GAMES = [
+  {away:"ATL", home:"PIT", spread:6.0,  total:40.5, kick:"Sun 10:00 AM PT", devin:"PIT -6.0",  devinNote:"amended off the model: ATL's available QB is Cooper Rush"},
+  {away:"BAL", home:"IND", spread:-3.5, total:47.5, kick:"Sun 10:00 AM PT", devin:"IND +3.5",  devinNote:"model edge 1.7"},
+  {away:"BUF", home:"HOU", spread:-1.5, total:44.5, kick:"Sun 10:00 AM PT", devin:"HOU +1.5",  devinNote:"coin flip, no opinion"},
+  {away:"CHI", home:"CAR", spread:-3.0, total:47.5, kick:"Sun 10:00 AM PT", devin:"CAR +3.0",  devinNote:"coin flip, no opinion"},
+  {away:"TB",  home:"CIN", spread:3.5,  total:50.5, kick:"Sun 10:00 AM PT", devin:"TB +3.5",   devinNote:"model edge 3.2"},
+  {away:"CLE", home:"JAX", spread:8.5,  total:39.5, kick:"Sun 10:00 AM PT", devin:"CLE +8.5",  devinNote:"model edge 1.3"},
+  {away:"NO",  home:"DET", spread:7.0,  total:49.5, kick:"Sun 10:00 AM PT", devin:"DET -7.0",  devinNote:"model edge 1.1"},
+  {away:"NYJ", home:"TEN", spread:1.5,  total:38.5, kick:"Sun 10:00 AM PT", devin:"TEN -1.5",  devinNote:"coin flip, no opinion"},
+  {away:"ARI", home:"LAC", spread:9.5,  total:47.5, kick:"Sun 1:25 PM PT",  devin:"ARI +9.5",  devinNote:"double weight, model has LAC -5.7 not -9.5"},
+  {away:"GB",  home:"MIN", spread:2.5,  total:46.5, kick:"Sun 1:25 PM PT",  devin:"GB +2.5",   devinNote:"model edge 1.8"},
+  {away:"MIA", home:"LV",  spread:3.0,  total:40.5, kick:"Sun 1:25 PM PT",  devin:"MIA +3.0",  devinNote:"double weight, biggest disagreement on the board"},
+  {away:"WAS", home:"PHI", spread:6.0,  total:44.5, kick:"Sun 1:25 PM PT",  devin:"PHI -6.0",  devinNote:"model edge 1.9"},
+  {away:"DAL", home:"NYG", spread:-3.0, total:48.5, kick:"Sun 5:20 PM PT",  devin:"NYG +3.0",  devinNote:"model edge 3.4"},
+];
+const TAKEN = "2026-09-12 15:48 PT";
+const KEY = "ats-2026-09-13";
+const MAX_STARS = 2;
+
+// spread is the home-team view: positive means the home team is favored.
+const line = (g, side) => {
+  const n = side === "home" ? -g.spread : g.spread;
+  return (n > 0 ? "+" : "") + n.toFixed(1);
+};
+const label = (g, side) => `${g[side]} ${line(g, side)}`;
+
+let state = load();
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.picks) && s.picks.length === GAMES.length) return s;
+  } catch (e) { /* fall through to a fresh card */ }
+  return { picks: GAMES.map(() => null), stars: GAMES.map(() => false) };
+}
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+function render() {
+  document.getElementById("taken").textContent = TAKEN;
+  const main = document.getElementById("games");
+  main.innerHTML = "";
+  GAMES.forEach((g, i) => {
+    const el = document.createElement("div");
+    el.className = "game" + (state.stars[i] ? " starred" : "");
+    el.innerHTML = `
+      <div class="meta"><span>${g.away} @ ${g.home}</span><span>${g.kick} &middot; total ${g.total.toFixed(1)}</span></div>
+      <div class="row">
+        <button class="side${state.picks[i] === "away" ? " on" : ""}" data-i="${i}" data-side="away">
+          <span class="team">${g.away}</span><span class="num">${line(g, "away")}</span>
+        </button>
+        <button class="side${state.picks[i] === "home" ? " on" : ""}" data-i="${i}" data-side="home">
+          <span class="team">${g.home}</span><span class="num">${line(g, "home")}</span>
+        </button>
+        <button class="star${state.stars[i] ? " on" : ""}" data-star="${i}" title="Double weight">&#9733;</button>
+      </div>`;
+    main.appendChild(el);
+  });
+  const picked = state.picks.filter(Boolean).length;
+  const stars = state.stars.filter(Boolean).length;
+  document.getElementById("count").textContent =
+    `${picked}/${GAMES.length} picked, ${stars}/${MAX_STARS} double weight`;
+}
+
+document.addEventListener("click", (e) => {
+  const side = e.target.closest(".side");
+  const star = e.target.closest(".star");
+  if (side) {
+    const i = +side.dataset.i;
+    state.picks[i] = state.picks[i] === side.dataset.side ? null : side.dataset.side;
+    save(); render();
+  } else if (star) {
+    const i = +star.dataset.star;
+    if (!state.stars[i] && state.stars.filter(Boolean).length >= MAX_STARS) {
+      alert(`Only ${MAX_STARS} double-weight games, same as Devin's card. Unstar one first.`);
+      return;
+    }
+    state.stars[i] = !state.stars[i];
+    save(); render();
+  }
+});
+
+document.getElementById("reset").onclick = () => {
+  if (!confirm("Clear all picks?")) return;
+  state = { picks: GAMES.map(() => null), stars: GAMES.map(() => false) };
+  save(); render();
+  document.getElementById("out").classList.add("hidden");
+};
+
+document.getElementById("copy").onclick = async () => {
+  const lines = [`Jonathan's ATS card — Sunday 2026-09-13 (DK lines as of ${TAKEN})`];
+  GAMES.forEach((g, i) => {
+    const p = state.picks[i];
+    lines.push(p
+      ? `${label(g, p)}${state.stars[i] ? "  (double weight)" : ""}`
+      : `${g.away} @ ${g.home} — no pick`);
+  });
+  const text = lines.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("Card copied. Paste it to Devin.");
+  } catch (e) {
+    alert("Couldn't reach the clipboard — copy the text below instead.");
+  }
+  const out = document.getElementById("out");
+  out.textContent = text + "\n\n--- Devin's card, for comparison ---\n" +
+    GAMES.map((g, i) => {
+      const mine = state.picks[i] ? label(g, state.picks[i]) : "no pick";
+      const same = state.picks[i] && label(g, state.picks[i]) === g.devin;
+      return `${g.devin.padEnd(10)} ${same ? "= you" : "vs " + mine}   (${g.devinNote})`;
+    }).join("\n");
+  out.classList.remove("hidden");
+  out.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+render();
+</script>
+</body>
+</html>
