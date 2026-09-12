@@ -143,7 +143,88 @@ Two concrete gaps explain most of it:
 the gap are snap share, red-zone/goal-line carry share, and the nflverse injury
 feed — not more tuning of the current features.
 
-## 4. `week_log.py` — the public record
+## 4. `features.py` + `td_logit.py` — adding scoring role (v2)
+
+The flatness above says the model can't tell *who scores* from *who plays*. So
+v2 replaces the single usage share with a logistic fit on features that describe
+scoring role, keeping team touchdowns from the market's implied total:
+
+| Feature | Source |
+|---|---|
+| red-zone target share (inside the 20) | play-by-play |
+| goal-line carry share (inside the 5) | play-by-play |
+| offensive snap share | `snap_counts` |
+| carry / target / TD share | weekly player stats |
+| position (QB, RB, TE) | weekly player stats |
+
+Every player feature is a prior-games-only trailing window that **spans the
+season boundary** — a season-to-date total is zero in week 1, exactly when the
+model is used.
+
+```bash
+python3 features.py    # cache red-zone/goal-line usage from play-by-play
+python3 td_logit.py    # fit 2016-2019, test 2020-2026
+```
+
+Fit on 16,743 player-games (2016–2019), tested on 29,544 (2020–2026):
+
+| Predictor | Brier | σ of predictions |
+|---|---|---|
+| Flat base rate | 0.16854 | 0 |
+| v1 usage share | 0.15792 | 0.088 |
+| **v2 scoring role** | **0.15507** | **0.105** |
+
+Calibration holds at the wider spread (predicted vs actual: 0.083/0.083,
+0.149/0.139, 0.244/0.250, 0.343/0.376, 0.443/0.474, 0.554/0.554).
+
+### Which of the new features actually paid
+
+Drop a feature, refit, rescore the same test rows:
+
+| Dropped | Brier | Δ |
+|---|---|---|
+| snap share | 0.15525 | +0.00019 |
+| position dummies | 0.15512 | +0.00005 |
+| goal-line carry share | 0.15507 | ±0.00000 |
+| red-zone target share | 0.15505 | **−0.00002** |
+| TD share | 0.15553 | +0.00047 |
+
+**Red-zone target share adds nothing measurable** — not for WRs (+0.00003), not
+for TEs (−0.00005), not for the top quartile of red-zone share (+0.00002), not
+on the high-priced end of the board (−0.00013). The intuition is right about who
+scores; the information is simply already inside target share and TD share,
+which is why adding it is redundant rather than wrong. Snap share is the only
+new input that helps, and it helps by 0.1% of Brier.
+
+So most of v2's gain came from the functional form, not the new data.
+
+### v2 against the live market. `live_props_v2.py`
+
+Same 225 matched Kalshi books, week 1 2026, now with players listed Out or
+Doubtful on the injury report dropped:
+
+| | v1 | v2 | market |
+|---|---|---|---|
+| mean | 0.196 | 0.217 | 0.214 |
+| σ | 0.083 | **0.105** | 0.134 |
+| correlation with market | 0.78 | **0.86** | — |
+
+| Market price | n | Market | v2 model | v2 − market | (v1 − market) |
+|---|---|---|---|---|---|
+| 0–10c | 51 | 0.067 | 0.130 | +6.3c | +5.6c |
+| 10–20c | 69 | 0.147 | 0.174 | +2.7c | +2.1c |
+| 20–30c | 47 | 0.242 | 0.222 | −2.0c | −4.2c |
+| 30–50c | 48 | 0.368 | 0.308 | −6.0c | −9.9c |
+| 50c+ | 10 | 0.559 | 0.492 | −6.7c | −20.5c |
+
+The favorite-end bias shrank from −20.5c to −6.7c and the longshot bias did not
+improve at all. The residual pattern is still monotone, so **v2 is closer to the
+market but still flatter, and still not tradeable.** The remaining large
+disagreements concentrate on rushing quarterbacks and goal-line backs, i.e.
+short-yardage role, which neither snap share nor season-long goal-line share
+captures for week 1.
+
+## 5. `week_log.py` — the public record
 
 ```bash
 bash fetch_data.sh          # refresh the nflverse data first
