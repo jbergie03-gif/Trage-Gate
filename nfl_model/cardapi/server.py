@@ -24,6 +24,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("CARD_DATA_DIR", os.path.join(ROOT, "data"))
 CARDS = os.path.join(DATA_DIR, "cards.jsonl")
 SHEET = os.environ.get("PICKSHEET", os.path.join(ROOT, "index.html"))
+# The published week page, uploaded by weekly_post.py. Served rather than
+# generated: fitting the model needs ~520 MB and the box has 458 MB.
+WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
 PORT = int(os.environ.get("PORT", "80"))
 MAX_BODY = 64 * 1024
 MAX_PICKS = 20
@@ -87,6 +90,11 @@ class Handler(BaseHTTPRequestHandler):
             if not os.path.exists(SHEET):
                 return self._send(404, {"error": "pick sheet not installed"})
             with open(SHEET, "rb") as fh:
+                return self._send(200, fh.read(), "text/html; charset=utf-8")
+        if url.path in ("/week", "/week.html"):
+            if not os.path.exists(WEEK):
+                return self._send(404, {"error": "no week page published"})
+            with open(WEEK, "rb") as fh:
                 return self._send(200, fh.read(), "text/html; charset=utf-8")
         if url.path == "/health":
             return self._send(200, {"ok": True, "cards": len(read_cards())})
