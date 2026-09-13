@@ -192,6 +192,50 @@ def label(r):
     return "reverse (home)" if money_home else "reverse (away)"
 
 
+def note(r):
+    """One line of market colour for a game, or None if there is none.
+
+    Deliberately silent on most games. A note on all sixteen is a wall of
+    percentages that reads as sixteen signals, when the measured base rates
+    say the only cuts worth a sentence are a lopsided crowd, a line that
+    actually travelled, or the two disagreeing. Every rate quoted here comes
+    from `--study` over 2019-2025, so the note carries its own sample size
+    rather than a reputation.
+    """
+    pub, move = r.get("public_home_pct"), r.get("spread_move")
+    home, away = r["home_team"], r["away_team"]
+    if pub:
+        side, pct = (home, pub) if pub > 50 else (away, 100 - pub)
+    else:
+        side = pct = None
+
+    if r.get("signal", "").startswith("reverse"):
+        toward = home if move > 0 else away
+        return (f"reverse line movement: {pct:.0f}% of tickets on {side}, "
+                f"but the number moved {abs(move):.1f} toward {toward}. "
+                f"Backing the move covered 57.9% (n=159) -- though 51% in "
+                f"the season with the most games, so it is a flag, not a bet")
+    # 65% rather than 60%: at 60 a third of the slate qualifies and the note
+    # stops being a point of interest, and the measured cover rate is flat
+    # across both buckets anyway, so the lower cut buys noise, not signal.
+    if pct and pct >= 65:
+        extra = (f", line moved {abs(move):.1f} the same way"
+                 if move and abs(move) >= 1
+                 and (move > 0) == (side == home) else "")
+        return (f"{pct:.0f}% of tickets on {side}{extra} -- crowds this "
+                f"lopsided covered 47.1% (n=204)")
+    if move and abs(move) >= 1:
+        toward = home if move > 0 else away
+        return (f"line moved {abs(move):.1f} toward {toward} since the "
+                f"opener -- movement alone covered 53.4% (n=788), inside "
+                f"the noise")
+    over = r.get("public_over_pct")
+    if over and over >= 65:
+        return (f"{over:.0f}% of tickets on the over -- the over hit 46.0% "
+                f"(n=113) in that bucket")
+    return None
+
+
 def collect(games, dates, refresh=False):
     """Scrape the given dates and attach each game's closing line and result.
 
@@ -312,6 +356,23 @@ def study(df):
               f"+/-{se:.1f}  (n={len(played)})")
 
 
+def slate_notes(season=None, week=None, refresh=False):
+    """Market notes for a slate, keyed by (away, home), for other scripts.
+
+    Falls back to an empty dict rather than raising: the picks are the point
+    and a scraper outage should cost the colour commentary, not the log.
+    """
+    try:
+        games = pd.read_csv(GAMES)
+        args = argparse.Namespace(dates=None, season=season, week=week)
+        df = collect(games, slate(games, args), refresh)
+        return {(r.away_team, r.home_team): note(r._asdict())
+                for r in df.itertuples()}
+    except Exception as exc:                                  # noqa: BLE001
+        print(f"market notes unavailable: {exc}")
+        return {}
+
+
 def slate(games, args):
     if args.dates:
         sel = games[games["gameday"].isin(args.dates)]
@@ -376,6 +437,17 @@ def main():
         formatters={"public_home_pct": "{:.0f}%".format,
                     "public_over_pct": "{:.0f}%".format,
                     "spread_move": "{:+.1f}".format}))
+
+    print("\npoints of interest")
+    said = False
+    for r in df.itertuples():
+        line = note(r._asdict())
+        if line:
+            said = True
+            print(f"  {r.away_team} @ {r.home_team}: {line}")
+    if not said:
+        print("  nothing on this slate: no lopsided crowd, no line that "
+              "moved a point, no disagreement between them")
 
     if args.save:
         df.to_csv(OUT, index=False)

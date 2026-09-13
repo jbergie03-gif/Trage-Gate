@@ -13,6 +13,7 @@ import zoneinfo
 import pandas as pd
 
 import elo
+import market_flow
 
 LOG = "/home/ubuntu/ff/2026_Pickem_Log.md"
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -71,16 +72,21 @@ def main():
         "than the closing spread out of sample (13.24 vs 12.72 RMSE), so these are",
         "logged to score the model, **not** as recommended bets. Both columns are",
         "expected home margin in points, so positive means the home team is favored.\n",
-        "| Game | Market (home margin) | Model (home margin) | Model − market |",
-        "|---|---|---|---|",
+        "| Game | Market (home margin) | Model (home margin) | Model − market | Market note |",
+        "|---|---|---|---|---|",
     ]
+    # Where the tickets are and where the number went, logged in the same row
+    # as the prediction rather than in a second report: the point of interest
+    # only matters while the pick is being made, and most games have none.
+    notes = market_flow.slate_notes(season, week)
     for g in sorted(slate, key=lambda g: g["gameday"]):
         pred = model.predict(g)
         market = g["spread_line"]
         if market is None or pd.isna(market):
             continue
         lines.append(f"| {g['away']} @ {g['home']} | {market:+.1f} | {pred:+.1f} "
-                     f"| {pred - market:+.1f} |")
+                     f"| {pred - market:+.1f} "
+                     f"| {notes.get((g['away'], g['home'])) or ''} |")
     lines.append("")
     lines.append("Player-level entries are deliberately absent: projections are not logged "
                  "until inactives and depth charts are verified for every player named.")

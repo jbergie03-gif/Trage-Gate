@@ -322,6 +322,22 @@ with the largest season (n=49) at 51.0%. A signal that is real does not need
 one season to carry it. Treated as information to report, not a bet: it earns
 its place only from a logged forward record.
 
+### Where it shows up
+
+Not as a second report. `note()` turns a game's row into one sentence, or
+returns nothing, and `slate_notes()` hands those to `week_log.py` so the
+weekly log carries a market note in the same row as the prediction. A note is
+written only for a crowd at 65%+, a line that moved a point or more, a
+lopsided over, or the two disagreeing; on a typical slate that is four or five
+games out of sixteen and the rest are silent. Each note quotes the cover rate
+and sample size for its own cut above, so the sentence cannot be read as a
+recommendation. `market_flow.py` with no arguments prints the same notes under
+the table for a one-off look at a game.
+
+None of this is a model feature. Line movement is the market's own answer, so
+feeding it to the model would cut the margin error while making
+"does it beat the line" unanswerable by construction.
+
 ## Data sources
 
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
