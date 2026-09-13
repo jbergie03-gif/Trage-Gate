@@ -46,3 +46,15 @@ ssh root@<host> 'systemctl daemon-reload && systemctl enable --now nfl-cards'
 
 Plain HTTP, so treat everything it holds as public. It holds spreads and pick'em
 selections and nothing else — no credentials and no personal data.
+
+## Publishing the week page
+
+`weekly_post.py` writes the page; the droplet only serves it. Fitting the model
+peaks around 520 MB and the box has 458 MB, so generation stays off it:
+
+```bash
+python3 ../weekly_post.py --out /tmp/week.html
+scp /tmp/week.html root@<host>:/opt/nfl-cards/week.html
+```
+
+No restart needed — the file is read per request. Served at `/week`.

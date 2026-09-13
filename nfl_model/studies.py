@@ -11,7 +11,7 @@ the team.
 Every cell prints its sample size, and a standard error so a 56% on 40 games
 is visibly not the same claim as a 56% on 400.
 
-Run: python3 studies.py [--travel] [--primetime] [--coaches] [--all]
+Run: python3 studies.py [--travel] [--primetime] [--coaches] [--totals] [--all]
 """
 import argparse
 import math
@@ -161,11 +161,66 @@ def coaches(df, min_games=8):
               f"{sub['won'].mean()*100:5.1f}% {p*100:5.1f}% {se(p, n)*100:4.1f}")
 
 
+def ou_row(name, s):
+    """Under rate for a slice, with the average line and average result.
+
+    The two averages are the part that says whether a cover rate is a real
+    scoring effect or a coin that landed: an under rate of 55% with the line
+    and the result on top of each other is noise, and the same 55% with the
+    line two points high is the market pricing something that is not there.
+    """
+    s = s[s["total"].notna() & s["total_line"].notna()]
+    live = s[s["total"] != s["total_line"]]            # drop pushes
+    if not len(live):
+        print(f"  {name:26s} no games")
+        return
+    p, n = (live["total"] < live["total_line"]).mean(), len(live)
+    print(f"  {name:26s} n={n:4d}  under {p*100:5.1f}%  +/-{se(p, n)*100:4.1f}"
+          f"   line {live['total_line'].mean():4.1f}  "
+          f"actual {live['total'].mean():4.1f}")
+
+
+def totals(min_season=1999):
+    """Week-1 unders: the one totals trend worth a look, and why it is not one.
+
+    Asked because week-1 unders hit 56% in the recent decade. They also hit
+    54% in the two decades before it, which is a better argument than the
+    single number -- except that the rolling ten-season window drops to 45.6%
+    in the middle, so the pooled rate is not a rate the bettor ever faced.
+    """
+    g = pd.read_csv(GAMES)
+    g = g[(g["game_type"] == "REG") & (g["season"] >= min_season)
+          & (g["season"] <= 2025)]
+
+    print(f"\n=== TOTALS: week 1 vs the rest, {min_season}-2025 ===")
+    print("break-even at -110 is 52.4%\n")
+    ou_row("week 1", g[g["week"] == 1])
+    ou_row("weeks 2+", g[g["week"] > 1])
+
+    print("\nweek 1 by era:")
+    for lo, hi in [(1999, 2005), (2006, 2015), (2016, 2025)]:
+        ou_row(f"{lo}-{hi}",
+               g[(g["week"] == 1) & g["season"].between(lo, hi)])
+
+    print("\nweek 1 by total posted:")
+    for lo, hi in [(0, 42), (42, 47), (47, 99)]:
+        s = g[(g["week"] == 1) & g["total_line"].between(lo, hi, "left")]
+        ou_row(f"line {lo}-{hi}", s)
+
+    print("\nweek 1, rolling ten seasons -- the reason this is not a trend:")
+    for start in range(min_season, 2017):
+        s = g[(g["week"] == 1) & g["season"].between(start, start + 9)]
+        live = s[s["total"] != s["total_line"]]
+        p = (live["total"] < live["total_line"]).mean()
+        print(f"  {start}-{start+9}  under {p*100:5.1f}%  n={len(live)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--travel", action="store_true")
     ap.add_argument("--primetime", action="store_true")
     ap.add_argument("--coaches", action="store_true")
+    ap.add_argument("--totals", action="store_true")
     ap.add_argument("--all", action="store_true")
     a = ap.parse_args()
     df = pd.read_csv(FEATURES)
@@ -175,6 +230,8 @@ def main():
         primetime(df)
     if a.coaches or a.all:
         coaches(df)
+    if a.totals or a.all:
+        totals()
 
 
 if __name__ == "__main__":
