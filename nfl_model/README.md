@@ -270,12 +270,68 @@ Appends to `/home/ubuntu/ff/2026_Pickem_Log.md` before kickoff, so the hit rate
 is auditable rather than remembered. Game-level only by design: no player is
 named until inactives and depth charts are verified.
 
+## 7. `market_flow.py` — public tickets vs where the line went
+
+```bash
+python3 market_flow.py --save            # next slate: public %, open -> close
+python3 market_flow.py --history 2019 2020 2021 2022 2023 2024 2025
+python3 market_flow.py --study           # grade every cut against the close
+```
+
+Two numbers that get conflated as "sharp money", kept apart: the share of
+spread *tickets* on each side, and what the books did about it. Where they
+point opposite ways — public on one side, the number moving the other — is
+reverse line movement, the only observable trace of non-public money in free
+data. Tickets are not dollars, so a 77% ticket share can be a minority of the
+handle; none of these columns is a dollar figure.
+
+Two traps the parser has to survive, both of which silently invent line
+movement if ignored:
+
+- The price history interleaves **alternate handicaps** with the main line —
+  the same game at +8.5 for −476 and +14.5 for −1400 seconds apart. Only
+  quotes priced near even money are the real line.
+- The first tick is a **May lookahead number**, not an opener. The opener that
+  means anything is the one hung for the week, so the walk back stops eight
+  days out.
+
+### What the signals are worth, 2019–2025
+
+1,537 games (318 dropped: where the scraped close and the graded close
+disagree by more than a half point, whichever is stale is stale *in the
+direction of the move*, and backing a two-point mover scores a fictional
+78.8%). Break-even at −110 is 52.4%.
+
+| Cut | Cover | n |
+|---|---:|---:|
+| Public 50–60% (the popular side) | 54.2% ±2.3 | 471 |
+| Public 60–70% | 46.7% ±2.6 | 362 |
+| Public 70%+ | 46.7% ±5.8 | 75 |
+| Backing a 0.5–2 pt move | 53.4% ±1.8 | 788 |
+| Backing a 2+ pt move | 52.8% ±2.7 | 341 |
+| **Reverse line movement** | **57.9% ±4.0** | 159 |
+| Over, public 65%+ on the over | 46.0% ±4.7 | 113 |
+
+The shape is the familiar one: fading a heavily-backed public side is mildly
+positive, and lopsided public overs go under. Neither clears break-even by
+more than a standard error.
+
+Reverse line movement is the one cut that looks like an edge, and it does not
+survive being split by season — 33%, 61%, 61%, 51%, 71% across 2021–2025,
+with the largest season (n=49) at 51.0%. A signal that is real does not need
+one season to carry it. Treated as information to report, not a bet: it earns
+its place only from a logged forward record.
+
 ## Data sources
 
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
   closing spread/total/moneyline, 1999–present.
 - [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases) —
   play-by-play, rosters, injuries, weekly player stats, through 2026.
+- [Sportsbook Review consensus](https://www.sportsbookreview.com/betting-odds/nfl-football/consensus/)
+  — public ticket percentages and per-book timestamped line history, served as
+  JSON in the page payload. Percentages exist from 2021 on, patchily in 2023;
+  line history reaches back to 2019.
 - Kalshi public trade API — live books.
 
 ## Standing caveat
