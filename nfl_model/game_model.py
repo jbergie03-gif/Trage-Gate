@@ -279,6 +279,45 @@ def summarize(p):
     print(f"  disagree coef  {beta[2]:.3f}  t={beta[2]/se[2]:.2f}")
     print("  (t above ~2 on the second row would be a real edge)")
 
+    # Same two tests on the total. Asked whether the edge might live here
+    # instead of on sides: the answer is that the disagreement coefficient
+    # finally clears t=2 while the O/U record stays on the coin. Both are
+    # printed because either one alone is misleading -- the coefficient says
+    # the model knows something the total does not, and the record says the
+    # something is worth about a quarter of a point against a 10-point error.
+    ou = p[p.total != p.total_line]
+    over = ou.pred_total > ou.total_line
+    hit = np.where(over, ou.total > ou.total_line, ou.total < ou.total_line)
+    print(f"O/U          {hit.mean()*100:.1f}%  ({hit.sum()}/{len(ou)})"
+          f"   blind under {(ou.total < ou.total_line).mean()*100:.1f}%")
+    edge = (ou.pred_total - ou.total_line).abs().values
+    for lo, hi in [(0, 1), (1, 3), (3, 5), (5, 99)]:
+        m = (edge >= lo) & (edge < hi)
+        if m.sum():
+            print(f"  |model - total| {lo}-{hi}: {hit[m].mean()*100:5.1f}%  "
+                  f"n={m.sum():4d}")
+
+    X = np.column_stack([np.ones(len(p)), p.total_line,
+                         p.pred_total - p.total_line])
+    beta, *_ = np.linalg.lstsq(X, p.total.values, rcond=None)
+    resid = p.total.values - X @ beta
+    s2 = resid @ resid / (len(p) - 3)
+    se = np.sqrt(np.diag(s2 * np.linalg.inv(X.T @ X)))
+    print("\ntotal ~ line + (model - line)")
+    print(f"  line coef      {beta[1]:.3f}  t={beta[1]/se[1]:.2f}")
+    print(f"  disagree coef  {beta[2]:.3f}  t={beta[2]/se[2]:.2f}")
+    print("  by season, since a pooled t-stat can be one good year:")
+    for season, g in p.groupby("season"):
+        if len(g) < 50:
+            continue
+        Xs = np.column_stack([np.ones(len(g)), g.total_line,
+                              g.pred_total - g.total_line])
+        b, *_ = np.linalg.lstsq(Xs, g.total.values, rcond=None)
+        r = g.total.values - Xs @ b
+        s = np.sqrt(np.diag(r @ r / (len(g) - 3)
+                            * np.linalg.inv(Xs.T @ Xs)))
+        print(f"    {season}  {b[2]:+.3f}  t={b[2]/s[2]:+.2f}  n={len(g)}")
+
     print("\nby week bucket (margin MAE):")
     for lo, hi, name in [(1, 1, "week 1"), (2, 4, "weeks 2-4"),
                          (5, 12, "weeks 5-12"), (13, 30, "week 13+")]:

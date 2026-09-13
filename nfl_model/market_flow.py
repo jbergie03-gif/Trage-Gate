@@ -28,6 +28,7 @@ import re
 import time
 import urllib.request
 
+import numpy as np
 import pandas as pd
 
 DATA = os.path.expanduser("~/nflmodel/data")
@@ -354,6 +355,25 @@ def study(df):
         se = (0.25 / len(played)) ** 0.5 * 100
         print(f"  over {lo}-{min(hi, 100)}%: over hit {rate:.1f}% "
               f"+/-{se:.1f}  (n={len(played)})")
+
+    # The same movement test on the total, dropped to the rows where the
+    # scraped and graded totals agree for the reason above.
+    tm = df[(df["total_line"] - df["close_total"]).abs() <= 0.5]
+    tm = tm.dropna(subset=["total", "total_line", "total_move"])
+    tm = tm[tm["total"] != tm["total_line"]]
+    print(f"\nbacking the direction the total moved ({len(tm)} games priced)")
+    for lo in [0.5, 1.0, 2.0]:
+        sub = tm[tm["total_move"].abs() >= lo]
+        if sub.empty:
+            continue
+        hit = np.where(sub["total_move"] > 0,
+                       sub["total"] > sub["total_line"],
+                       sub["total"] < sub["total_line"])
+        se = (0.25 / len(sub)) ** 0.5 * 100
+        print(f"  moved {lo}+ pts: {hit.mean()*100:.1f}% +/-{se:.1f} "
+              f"(n={len(sub)})")
+    base = float((tm["total"] < tm["total_line"]).mean() * 100)
+    print(f"  [base rate: blind under {base:.1f}%, n={len(tm)}]")
 
 
 def slate_notes(season=None, week=None, refresh=False):

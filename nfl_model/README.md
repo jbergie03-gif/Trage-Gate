@@ -338,6 +338,59 @@ None of this is a model feature. Line movement is the market's own answer, so
 feeding it to the model would cut the margin error while making
 "does it beat the line" unanswerable by construction.
 
+## 8. Totals: is the edge on over/unders instead?
+
+Asked directly, after three flat tests on sides. Three separate tests, all on
+the same data as above.
+
+**The model against the closing total**, 1,943 out-of-sample games, `--report`:
+
+| | value |
+|---|---|
+| O/U record taking the model's side | 50.3% |
+| Blind under, same games | 51.1% |
+| `total ~ total_line + (model − line)` disagreement coef | **+0.269, t=2.14** |
+
+That t-stat is the first thing in this repo to clear 2, and it is still not a
+bet. The coefficient says a 5-point disagreement with the total is worth
+\(5 \times 0.269 \approx 1.3\) points of real scoring — against a 10.4-point
+per-game error, which is why the record is a coin flip. It also does not
+survive being split by season: +0.19, +0.15, +1.02, +0.23, +0.92, −0.27,
++0.56 across 2019–2025, so two years carry the pooled number and 2024 is
+negative. Bucketing by edge size does not help either — 48.9% under a point,
+49.9% over five.
+
+**The market's own total movement** (`market_flow.py --study`, 1,360 aligned
+games): backing a 0.5+ move covers 47.8%, 1+ covers 49.6%, 2+ covers 51.7%,
+against a 50.7% blind-under base rate. Movement on totals is, if anything,
+mildly contrarian, and none of it clears break-even.
+
+**Week-1 unders**, `studies.py --totals`, 1999–2025:
+
+| Cut | Under | n |
+|---|---:|---:|
+| Week 1 | 54.7% ±2.4 | 424 |
+| Weeks 2+ | 50.2% ±0.6 | 6,444 |
+| Week 1, 1999–2005 | 54.2% ±4.8 | 107 |
+| Week 1, 2006–2015 | 53.8% ±4.0 | 158 |
+| Week 1, 2016–2025 | 56.0% ±3.9 | 159 |
+
+The effect is in the scoring, not just the ledger: week-1 games are posted at
+43.4 and land at 42.9, while weeks 2+ are posted at 43.5 and land at 44.3. So
+the market prices week 1 like a normal week and week 1 is about a point and a
+half lighter. Consistent across all three eras, which is more than any other
+cut here manages.
+
+It is still not a bet, and the rolling ten-season window is why: 59.0% for
+2001–2010, **45.6% for 2011–2020**, 56.0% for 2016–2025. A bettor starting in
+2011 would have lost for a decade on the same "trend". 54.7% is 0.96 standard
+errors above the 52.4% break-even — the same distance from noise as the
+week-1 favorite result, and driven by the same 16-games-a-year sample.
+
+**Answer to the question: no, the edge is not in totals either.** The
+model knows slightly more about totals than about sides, and "slightly more"
+is a quarter of a point.
+
 ## Data sources
 
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
