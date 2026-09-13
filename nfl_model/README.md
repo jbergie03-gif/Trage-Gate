@@ -224,7 +224,41 @@ disagreements concentrate on rushing quarterbacks and goal-line backs, i.e.
 short-yardage role, which neither snap share nor season-long goal-line share
 captures for week 1.
 
-## 5. `week_log.py` — the public record
+## 5. `injuries.py` — pricing the injury report
+
+```bash
+python3 injuries.py                  # writes data/injury_burden.csv
+```
+
+Counting injured bodies measures nothing: a team can list eight names and lose
+nobody who plays. Each player on the report is instead weighted by the snap
+share he had been taking, and by how often his designation actually sits (Out
+1.0, Doubtful 0.75, Questionable 0.25). The quarterback is excluded because he
+is already a first-class model input.
+
+Two joins are worth knowing about, because both were wrong on the first pass:
+
+- The injury feed keys players by `gsis_id`, the snap feed by `pfr_id`, so they
+  go through nflverse's player crosswalk. Name matching linked 29% of rows; the
+  crosswalk links 96.5%.
+- A player who is Out has no snap row for the game he missed, so the share
+  cannot be looked up by week — it walks back to his most recent cumulative
+  average, then to last season's. Without that the players who matter most are
+  exactly the ones missing from the join.
+
+**Measured effect, 1,962 held-out games:** correctly signed and statistically
+real — the away team missing more of its offense lifts the home margin by 0.60
+points per standard deviation (z = 2.9), defense 0.48 (z = 2.3), which ranks
+them behind only the efficiency metrics and the quarterback. **But accuracy does
+not improve:** margin MAE 10.247 → 10.232, totals unchanged, ATS 48.9% → 48.2%.
+The effect is real and too small to see through 10 points of noise. Kept in the
+design matrix, since the case it exists for is the one game where a team is
+missing three starters.
+
+Known limitation: all snaps are valued equally, so a left tackle and a fourth
+receiver at the same snap share count the same.
+
+## 6. `week_log.py` — the public record
 
 ```bash
 bash fetch_data.sh          # refresh the nflverse data first
@@ -236,12 +270,68 @@ Appends to `/home/ubuntu/ff/2026_Pickem_Log.md` before kickoff, so the hit rate
 is auditable rather than remembered. Game-level only by design: no player is
 named until inactives and depth charts are verified.
 
+## 7. `market_flow.py` — public tickets vs where the line went
+
+```bash
+python3 market_flow.py --save            # next slate: public %, open -> close
+python3 market_flow.py --history 2019 2020 2021 2022 2023 2024 2025
+python3 market_flow.py --study           # grade every cut against the close
+```
+
+Two numbers that get conflated as "sharp money", kept apart: the share of
+spread *tickets* on each side, and what the books did about it. Where they
+point opposite ways — public on one side, the number moving the other — is
+reverse line movement, the only observable trace of non-public money in free
+data. Tickets are not dollars, so a 77% ticket share can be a minority of the
+handle; none of these columns is a dollar figure.
+
+Two traps the parser has to survive, both of which silently invent line
+movement if ignored:
+
+- The price history interleaves **alternate handicaps** with the main line —
+  the same game at +8.5 for −476 and +14.5 for −1400 seconds apart. Only
+  quotes priced near even money are the real line.
+- The first tick is a **May lookahead number**, not an opener. The opener that
+  means anything is the one hung for the week, so the walk back stops eight
+  days out.
+
+### What the signals are worth, 2019–2025
+
+1,537 games (318 dropped: where the scraped close and the graded close
+disagree by more than a half point, whichever is stale is stale *in the
+direction of the move*, and backing a two-point mover scores a fictional
+78.8%). Break-even at −110 is 52.4%.
+
+| Cut | Cover | n |
+|---|---:|---:|
+| Public 50–60% (the popular side) | 54.2% ±2.3 | 471 |
+| Public 60–70% | 46.7% ±2.6 | 362 |
+| Public 70%+ | 46.7% ±5.8 | 75 |
+| Backing a 0.5–2 pt move | 53.4% ±1.8 | 788 |
+| Backing a 2+ pt move | 52.8% ±2.7 | 341 |
+| **Reverse line movement** | **57.9% ±4.0** | 159 |
+| Over, public 65%+ on the over | 46.0% ±4.7 | 113 |
+
+The shape is the familiar one: fading a heavily-backed public side is mildly
+positive, and lopsided public overs go under. Neither clears break-even by
+more than a standard error.
+
+Reverse line movement is the one cut that looks like an edge, and it does not
+survive being split by season — 33%, 61%, 61%, 51%, 71% across 2021–2025,
+with the largest season (n=49) at 51.0%. A signal that is real does not need
+one season to carry it. Treated as information to report, not a bet: it earns
+its place only from a logged forward record.
+
 ## Data sources
 
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
   closing spread/total/moneyline, 1999–present.
 - [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases) —
   play-by-play, rosters, injuries, weekly player stats, through 2026.
+- [Sportsbook Review consensus](https://www.sportsbookreview.com/betting-odds/nfl-football/consensus/)
+  — public ticket percentages and per-book timestamped line history, served as
+  JSON in the page payload. Percentages exist from 2021 on, patchily in 2023;
+  line history reaches back to 2019.
 - Kalshi public trade API — live books.
 
 ## Standing caveat
