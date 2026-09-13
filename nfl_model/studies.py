@@ -275,6 +275,27 @@ def baseline():
               f"market {mkt:.2f}; features close "
               f"{(dumb - mdl) / (dumb - mkt) * 100:.0f}% of the gap")
 
+    # Mean error punishes a blowout miss that an over/under bettor does not
+    # care about, so score the totals model the way the bet actually settles:
+    # right side of the posted number or not. The constant guesser is scored
+    # the same way, as the floor.
+    ou = p[p["total"] != p["total_line"]]
+    hit = (((ou["pred_total"] - ou["total_line"])
+            * (ou["total"] - ou["total_line"])) > 0)
+    robot = (((prior_total.loc[ou.index] - ou["total_line"])
+              * (ou["total"] - ou["total_line"])) > 0)
+    under = ou["total"] < ou["total_line"]
+    print("\ntotal, over/under hit rate (break-even 52.4% at -110)")
+    for name, s in [("model's side", hit), ("constant guesser", robot),
+                    ("always under", under)]:
+        print(f"  {name:26s} {s.mean()*100:5.1f}%  +/-"
+              f"{se(s.mean(), len(s))*100:4.1f}  n={len(s)}")
+    print("  by size of disagreement with the posted total:")
+    for lo, hi in [(0, 1), (1, 3), (3, 5), (5, 99)]:
+        m = (ou["pred_total"] - ou["total_line"]).abs().between(lo, hi, "left")
+        print(f"    {lo}-{hi} pts{'':16s}{hit[m].mean()*100:5.1f}%  +/-"
+              f"{se(hit[m].mean(), int(m.sum()))*100:4.1f}  n={int(m.sum())}")
+
 
 def leak_ablation():
     """Refit without the features that are not fully knowable pre-kickoff.
