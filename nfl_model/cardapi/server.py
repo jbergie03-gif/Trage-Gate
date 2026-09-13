@@ -13,9 +13,15 @@ No third-party packages, so there is nothing to install and nothing to break
 before kickoff.
 """
 import datetime
+import hmac
 import json
 import os
+import re
+import secrets
+import threading
+import time
 import zoneinfo
+from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -23,6 +29,8 @@ PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("CARD_DATA_DIR", os.path.join(ROOT, "data"))
 CARDS = os.path.join(DATA_DIR, "cards.jsonl")
+SUBS = os.path.join(DATA_DIR, "subscribers.jsonl")
+SECRET_FILE = os.path.join(DATA_DIR, "subscriber_secret")
 SHEET = os.environ.get("PICKSHEET", os.path.join(ROOT, "index.html"))
 # The published week page, uploaded by weekly_post.py. Served rather than
 # generated: fitting the model needs ~520 MB and the box has 458 MB.
@@ -30,6 +38,12 @@ WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
 PORT = int(os.environ.get("PORT", "80"))
 MAX_BODY = 64 * 1024
 MAX_PICKS = 20
+# Deliberately loose: the only address format worth rejecting is one that
+# cannot be sent to at all. Anything stricter bounces real addresses, and the
+# real confirmation that an address works is the first delivery.
+EMAIL = re.compile(r"^[^@\s,;<>]{1,64}@[^@\s,;<>.]+(\.[^@\s,;<>.]+)+$")
+SIGNUP_LIMIT = 20          # per IP
+SIGNUP_WINDOW = 3600       # seconds
 
 
 def read_cards():
@@ -68,6 +82,109 @@ def clean(card):
     }
 
 
+_lock = threading.Lock()
+_hits = {}
+
+
+def secret():
+    """Per-box key for unsubscribe tokens, created on first use.
+
+    Kept in the data dir rather than the environment so the tokens in already
+    delivered emails keep working across a restart or a redeploy — an
+    unsubscribe link that stops working is the CAN-SPAM violation.
+    """
+    if os.path.exists(SECRET_FILE):
+        with open(SECRET_FILE) as fh:
+            return fh.read().strip().encode()
+    os.makedirs(DATA_DIR, exist_ok=True)
+    key = secrets.token_urlsafe(32)
+    fd = os.open(SECRET_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with open(fd, "w") as fh:
+        fh.write(key)
+    return key.encode()
+
+
+def token(email):
+    """Unsubscribe token: derived, not stored, so it cannot drift out of sync.
+
+    Signed with the box key, so a token for one address says nothing about any
+    other and nobody can unsubscribe a stranger by guessing.
+    """
+    return hmac.new(secret(), email.encode(), sha256).hexdigest()[:32]
+
+
+def clean_email(raw):
+    email = str(raw or "").strip().lower()
+    if len(email) > 254 or not EMAIL.match(email):
+        raise ValueError("that does not look like an email address")
+    return email
+
+
+def read_subs():
+    if not os.path.exists(SUBS):
+        return []
+    with open(SUBS) as fh:
+        return [json.loads(line) for line in fh if line.strip()]
+
+
+def subscriber_state():
+    """Current list, from the append-only log: last event per address wins.
+
+    Unsubscribes are recorded rather than deleted so that a later resubscribe
+    is visible as its own event instead of looking like the first one.
+    """
+    state = {}
+    for row in read_subs():
+        state[row["email"]] = row
+    return state
+
+
+def log_sub(email, event, source=""):
+    row = {
+        "at_pt": datetime.datetime.now(PACIFIC).isoformat(timespec="seconds"),
+        "email": email,
+        "event": event,
+        "source": source[:40],
+    }
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with _lock:
+        with open(SUBS, "a") as fh:
+            fh.write(json.dumps(row) + "\n")
+        try:
+            os.chmod(SUBS, 0o600)
+        except OSError:
+            pass
+    return row
+
+
+def rate_limited(ip):
+    """Cheap per-IP cap on signups. Open endpoint on a 512 MB box: the point
+    is to keep a script from filling the disk, not to stop a determined flood.
+    """
+    now = time.time()
+    with _lock:
+        hits = [t for t in _hits.get(ip, []) if now - t < SIGNUP_WINDOW]
+        hits.append(now)
+        _hits[ip] = hits
+        if len(_hits) > 5000:
+            _hits.clear()
+        return len(hits) > SIGNUP_LIMIT
+
+
+def page(title, body):
+    return (f"<!doctype html><meta charset=utf-8>"
+            f"<meta name=viewport content='width=device-width,initial-scale=1'>"
+            f"<title>{title}</title>"
+            f"<style>body{{background:#0d1117;color:#e6edf3;font:16px/1.6 "
+            f"-apple-system,Segoe UI,Roboto,sans-serif;margin:0;display:flex;"
+            f"min-height:100vh;align-items:center;justify-content:center;"
+            f"padding:24px}}div{{max-width:32rem;text-align:center}}"
+            f"h1{{font-size:1.4rem;margin:0 0 .6rem}}"
+            f"p{{color:#9aa7b4;margin:.4rem 0}}"
+            f"a{{color:#7c8cff}}</style>"
+            f"<div><h1>{title}</h1>{body}</div>").encode()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "cardapi"
 
@@ -97,7 +214,14 @@ class Handler(BaseHTTPRequestHandler):
             with open(WEEK, "rb") as fh:
                 return self._send(200, fh.read(), "text/html; charset=utf-8")
         if url.path == "/health":
-            return self._send(200, {"ok": True, "cards": len(read_cards())})
+            live = [r for r in subscriber_state().values()
+                    if r["event"] == "subscribe"]
+            return self._send(200, {"ok": True, "cards": len(read_cards()),
+                                    "subscribers": len(live)})
+        if url.path == "/unsubscribe":
+            return self._unsubscribe(q)
+        if url.path == "/subscribers":
+            return self._subscribers()
         if url.path == "/cards":
             rows = [r for r in read_cards()
                     if (not slate or r["slate"] == slate) and (not who or r["who"] == who)]
@@ -111,8 +235,91 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"revisions": len(rows), "card": rows[-1]})
         return self._send(404, {"error": "not found"})
 
+    def _unsubscribe(self, q):
+        """One click, no login, no confirmation step.
+
+        Required to work from a link in an email, which means it has to work
+        for someone who is not logged in and will not fill in a form.
+        """
+        email = (q.get("e") or [""])[0].strip().lower()
+        given = (q.get("t") or [""])[0]
+        if not email or not given:
+            return self._send(400, page(
+                "Link incomplete",
+                "<p>Use the unsubscribe link from the bottom of the email, or "
+                "reply to it and you will be removed by hand.</p>"),
+                "text/html; charset=utf-8")
+        if not hmac.compare_digest(token(email), given):
+            return self._send(400, page(
+                "Link not recognized",
+                "<p>Use the unsubscribe link from the bottom of the email, or "
+                "reply to it and you will be removed by hand.</p>"),
+                "text/html; charset=utf-8")
+        log_sub(email, "unsubscribe", "link")
+        return self._send(200, page(
+            "You're unsubscribed",
+            "<p>No more emails will be sent to this address. Nothing else "
+            "needed.</p>"), "text/html; charset=utf-8")
+
+    def _subscribers(self):
+        """The list itself, behind a token. Never public: these are real
+        addresses belonging to other people, and /health already answers the
+        only question that needs answering from outside.
+        """
+        want = os.environ.get("ADMIN_TOKEN", "")
+        got = self.headers.get("X-Admin-Token", "")
+        if not want:
+            return self._send(503, {"error": "ADMIN_TOKEN is not configured"})
+        if not hmac.compare_digest(want, got):
+            return self._send(403, {"error": "forbidden"})
+        live = sorted(r["email"] for r in subscriber_state().values()
+                      if r["event"] == "subscribe")
+        return self._send(200, {"count": len(live), "subscribers": live})
+
+    def _subscribe(self, length, form):
+        ip = self.client_address[0]
+        if rate_limited(ip):
+            msg = "too many signups from this connection, try later"
+            return self._reply_sub(form, 429, {"error": msg},
+                                   "Try again shortly", f"<p>{msg}.</p>")
+        raw = self.rfile.read(length)
+        try:
+            if form:
+                fields = parse_qs(raw.decode("utf-8", "replace"))
+                email = clean_email((fields.get("email") or [""])[0])
+                source = (fields.get("source") or [""])[0]
+            else:
+                body = json.loads(raw)
+                if not isinstance(body, dict):
+                    raise ValueError("body must be a JSON object")
+                email = clean_email(body.get("email"))
+                source = str(body.get("source", ""))
+        except (ValueError, json.JSONDecodeError) as exc:
+            return self._reply_sub(form, 400, {"error": str(exc)},
+                                   "Check that address", f"<p>{exc}.</p>")
+
+        prior = subscriber_state().get(email)
+        # A second signup is the normal case, not an error: people forget. Log
+        # it so a resubscribe after an unsubscribe is recorded as consent.
+        if not prior or prior["event"] != "subscribe":
+            log_sub(email, "subscribe", source)
+        return self._reply_sub(
+            form, 200, {"ok": True, "email": email},
+            "You're on the list",
+            "<p>The week's numbers land in your inbox before Sunday's games. "
+            "Every email has a one-click unsubscribe.</p>"
+            "<p><a href='/week'>Back to this week</a></p>")
+
+    def _reply_sub(self, form, code, payload, title, body):
+        """A form POST navigates, so it needs a page; fetch() needs the JSON."""
+        if form:
+            return self._send(code, page(title, body),
+                              "text/html; charset=utf-8")
+        return self._send(code, payload)
+
     def do_POST(self):
-        if urlparse(self.path).path != "/card":
+        path = urlparse(self.path).path
+        if path not in ("/card", "/subscribe"):
             return self._send(404, {"error": "not found"})
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -120,6 +327,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "bad Content-Length"})
         if length <= 0 or length > MAX_BODY:
             return self._send(400, {"error": "body must be 1 byte to 64 KiB"})
+        if path == "/subscribe":
+            ctype = (self.headers.get("Content-Type") or "").lower()
+            form = "application/x-www-form-urlencoded" in ctype
+            return self._subscribe(length, form)
         try:
             card = clean(json.loads(self.rfile.read(length)))
         except (ValueError, json.JSONDecodeError) as exc:

@@ -24,9 +24,35 @@ Two properties are deliberate:
 | POST | `/card` | Submit: `{slate, who, picks:[{game, side, double}]}` |
 | GET | `/latest?slate=&who=` | The card that stands, plus a revision count |
 | GET | `/cards?slate=&who=` | Full submission history |
-| GET | `/health` | Liveness and card count |
+| GET | `/health` | Liveness, card count, active subscriber count |
+| GET | `/week` | The weekly model-vs-market page |
+| POST | `/subscribe` | Email signup: JSON or form `{email, source}` |
+| GET | `/unsubscribe?e=&t=` | One-click opt-out from an email footer |
+| GET | `/subscribers` | Active list, requires `X-Admin-Token` |
 
 Cards are JSON lines in `$CARD_DATA_DIR/cards.jsonl`.
+
+## Subscribers
+
+`$CARD_DATA_DIR/subscribers.jsonl`, append-only like the cards: signups,
+unsubscribes and resubscribes are all events, and the last event for an address
+is its current state. Nothing is ever deleted, so "they asked to be removed and
+we kept mailing them" is answerable from the file.
+
+Unsubscribe links carry an HMAC of the address keyed by
+`$CARD_DATA_DIR/subscriber_secret` (created `0600` on first use). Links keep
+working across restarts and redeploys because the key is on disk rather than in
+memory — a dead unsubscribe link is a CAN-SPAM problem, not an inconvenience.
+
+`/subscribers` returns 503 until `ADMIN_TOKEN` is set in the unit's
+environment, so the list cannot be read by default. Set it out of band:
+
+```bash
+ssh root@<host> 'systemctl edit --force nfl-cards'   # Environment=ADMIN_TOKEN=...
+```
+
+Signups are rate limited to 20 per hour per IP. The endpoint is public, so
+treat the list as unverified addresses — there is no confirmation email yet.
 
 ## Run locally
 
@@ -44,8 +70,10 @@ scp nfl-cards.service root@<host>:/etc/systemd/system/
 ssh root@<host> 'systemctl daemon-reload && systemctl enable --now nfl-cards'
 ```
 
-Plain HTTP, so treat everything it holds as public. It holds spreads and pick'em
-selections and nothing else — no credentials and no personal data.
+Plain HTTP on a bare IP. That was fine when the box held only spreads and
+pick'em selections; it now takes email addresses, which means **signups travel
+unencrypted**. A domain with TLS should land before the page is advertised
+anywhere. No credentials are stored either way.
 
 ## Publishing the week page
 
@@ -58,3 +86,14 @@ scp /tmp/week.html root@<host>:/opt/nfl-cards/week.html
 ```
 
 No restart needed — the file is read per request. Served at `/week`.
+
+The same command also writes `/tmp/week.png`, the 1080x1350 Instagram frame,
+and `/tmp/week_post.html` that it is rendered from. The image is a separate
+dense layout rather than a screenshot of the page: a 16-game slate does not fit
+in a 4:5 frame one card at a time. `--no-image` skips it.
+
+Changes to `server.py` do need a restart:
+
+```bash
+scp server.py root@<host>:/opt/nfl-cards/ && ssh root@<host> 'systemctl restart nfl-cards'
+```

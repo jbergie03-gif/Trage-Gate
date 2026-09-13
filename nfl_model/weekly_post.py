@@ -6,18 +6,28 @@ last week's scored record at the top. No game footage anywhere in it, which is
 the entire point -- footage is fingerprinted and monetized by the league, so a
 page built from original numbers is the only version of this that pays.
 
-Run: python3 weekly_post.py [--out path] [--season S --week W]
+Also emits a 1080x1350 PNG of the same page for Instagram, so the post and the
+page cannot say different things.
+
+Run: python3 weekly_post.py [--out path] [--season S --week W] [--no-image]
 """
 import argparse
 import datetime
 import html
 import os
+import shutil
+import subprocess
 import zoneinfo
 
 import pandas as pd
 
 import game_model
 import market_flow
+
+try:
+    from PIL import Image
+except ImportError:            # the page still generates without the image
+    Image = None
 
 GAMES = game_model.GAMES
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -129,8 +139,149 @@ background:#1e1a10;border:1px solid #3a2f12;font-size:13px;color:#e6d7a8}
 footer{margin-top:28px;color:var(--dim);font-size:12.5px;border-top:1px solid var(--line);
 padding-top:16px}
 footer b{color:var(--text)}
-@media(max-width:420px){.nums{grid-template-columns:1fr}}
+.signup{background:var(--card);border:1px solid var(--line);border-radius:14px;
+padding:16px;margin-top:22px}
+.signup h2{font-size:17px;margin:0 0 6px;letter-spacing:-.01em}
+.signup p{color:var(--dim);font-size:13.5px;margin:0 0 12px}
+.signup form{display:flex;gap:8px}
+.signup input{flex:1;min-width:0;background:#0f1115;color:var(--text);
+border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit}
+.signup input:focus{outline:none;border-color:var(--model)}
+.signup button{background:var(--model);color:#fff;border:0;border-radius:10px;
+padding:11px 16px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+.signup .fine{font-size:11.5px;margin:10px 0 0}
+.signup .msg{font-size:13px;margin:10px 0 0;color:var(--model)}
+.inbio{background:var(--card);border:1px solid var(--line);border-radius:14px;
+padding:16px;margin-top:22px;text-align:center}
+.inbio h2{font-size:17px;margin:0 0 4px}
+.inbio p{color:var(--dim);font-size:13.5px;margin:0}
+@media(max-width:420px){.nums{grid-template-columns:1fr}
+.signup form{flex-direction:column}}
 """
+
+# The offer, worded so it can be kept every week for years. Not "picks": the
+# model loses to the closing line, so promising winners is promising the one
+# thing the measurements say cannot be delivered.
+OFFER = ("My model's number for every game next to Vegas's number, plus how "
+         "last week's predictions actually did — emailed before Sunday. "
+         "Free, and no picks are sold here.")
+
+SIGNUP = f"""<div class="signup"><h2>Get it in your inbox</h2>
+<p>{OFFER}</p>
+<form method="post" action="/subscribe" id="su">
+<input type="email" name="email" required autocomplete="email"
+ placeholder="you@email.com" aria-label="Email address">
+<input type="hidden" name="source" value="week-page">
+<button type="submit">Send it to me</button></form>
+<p class="msg" id="sm" hidden></p>
+<p class="fine">One email a week during the season. Every one has an
+unsubscribe link that works in one click. Your address is not sold or
+shared.</p></div>
+<script>
+var f=document.getElementById('su'),m=document.getElementById('sm');
+f.addEventListener('submit',function(e){{
+  e.preventDefault();
+  var b=f.querySelector('button'),email=f.email.value;
+  b.disabled=true;
+  fetch('/subscribe',{{method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body:JSON.stringify({{email:email,source:'week-page'}})}})
+  .then(function(r){{return r.json().then(function(j){{return [r.ok,j]}})}})
+  .then(function(p){{
+    m.hidden=false;b.disabled=false;
+    m.textContent=p[0]?"You're on the list. Look for it before Sunday."
+      :(p[1].error||'That did not go through.');
+    if(p[0]){{f.reset()}}
+  }}).catch(function(){{b.disabled=false;f.submit()}});
+}});
+</script>"""
+
+# Instagram is a fixed 1080x1350 frame, so the post cannot be a crop of the
+# scrolling page -- that truncates mid-card and drops most of the slate. Every
+# game has to fit at once, which means one dense row each.
+POST_CSS = """
+:root{--bg:#0f1115;--card:#181b22;--line:#262b36;--text:#e8eaed;
+--dim:#9aa0ac;--model:#a371f7;--market:#58a6ff}
+*{box-sizing:border-box;margin:0}
+body{width:1080px;height:1350px;background:var(--bg);color:var(--text);
+font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+padding:44px 48px;display:flex;flex-direction:column;overflow:hidden}
+h1{font-size:48px;letter-spacing:-.03em;line-height:1.05;flex-shrink:0}
+.sub{color:var(--dim);font-size:20px;margin-top:8px;flex-shrink:0}
+/* The column labels sit in the same grid as the rows so each one lands over
+   the numbers it names. */
+.head,.r{display:grid;grid-template-columns:1fr 128px 128px 90px;gap:12px;
+padding:0 19px}
+.head{font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+font-weight:600;margin:20px 0 8px;flex-shrink:0}
+.head div:not(:first-child){text-align:right}
+.head .m{color:var(--market)}
+.head .p{color:var(--model)}
+.head .g{color:var(--dim)}
+.rows{flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-height:0}
+.r{background:var(--card);border:1px solid var(--line);border-radius:12px;
+align-items:center;flex:1 1 0;min-height:0;overflow:hidden}
+.t{font-size:23px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;
+overflow:hidden;text-overflow:ellipsis}
+.t span{color:var(--dim);font-weight:400;font-size:19px;margin:0 7px}
+.n{font-size:24px;font-variant-numeric:tabular-nums;font-weight:600;
+text-align:right}
+.n.m{color:var(--market)}
+.n.p{color:var(--model)}
+.d{text-align:right;font-size:19px;font-variant-numeric:tabular-nums;
+color:var(--dim)}
+.d.big{color:var(--model);font-weight:600}
+footer{margin-top:16px;border-top:1px solid var(--line);padding-top:16px;
+display:flex;justify-content:space-between;align-items:flex-end;gap:24px;
+flex-shrink:0}
+footer .l{font-size:20px;color:var(--dim);max-width:640px}
+footer .l b{color:var(--text)}
+footer .cta{text-align:right;font-size:21px;font-weight:600;white-space:nowrap}
+footer .cta span{display:block;font-size:16px;font-weight:400;
+color:var(--dim);margin-top:4px}
+"""
+
+
+def post_render(season, week, rows, rec, now):
+    """The Instagram frame: the whole slate at a glance, no form, no scroll.
+
+    Carries the same two numbers per game as the page and the same honest
+    footer, so the post cannot promise more than the page delivers.
+    """
+    o = ['<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+         f"<style>{POST_CSS}</style></head><body>",
+         f"<h1>Week {week}: my model vs the market</h1>",
+         f'<div class="sub">All {len(rows)} games \u00b7 posted '
+         f"{now:%A %B %-d} \u00b7 before kickoff</div>",
+         '<div class="head"><div></div><div class="m">Vegas</div>'
+         '<div class="p">My model</div><div class="g">Gap</div></div>',
+         '<div class="rows">']
+
+    for r in rows:
+        mteam, mby = side(r["spread_line"], r["home"], r["away"])
+        team, by = side(r["pred_margin"], r["home"], r["away"])
+        gap = abs(r["pred_margin"] - r["spread_line"])
+        o.append(
+            f'<div class="r"><div class="t">{html.escape(TEAMS[r["away"]])}'
+            f'<span>at</span>{html.escape(TEAMS[r["home"]])}</div>'
+            f'<div class="n m">{mteam} \u2212{mby:.1f}</div>'
+            f'<div class="n p">{team} \u2212{by:.1f}</div>'
+            f'<div class="d{" big" if gap >= 2.5 else ""}">'
+            f'{gap:.1f}</div></div>')
+    o.append("</div>")
+
+    if rec:
+        left = (f"<b>Last week, scored:</b> {rec['su']:.0%} straight up on "
+                f"{rec['n']} games. My average miss {rec['mae']:.1f} points, "
+                f"Vegas {rec['mkt_mae']:.1f}. I post that either way.")
+    else:
+        left = ("<b>Every prediction gets scored here</b> the week after, "
+                "including the weeks it goes badly.")
+    o.append(f'<footer><div class="l">{left}</div>'
+             '<div class="cta">Free weekly email'
+             "<span>link in bio \u00b7 no picks sold</span></div>"
+             "</footer></body></html>")
+    return "\n".join(o)
 
 
 def render(season, week, rows, rec, now):
@@ -179,6 +330,8 @@ def render(season, week, rows, rec, now):
             o.append(f'<div class="note">{html.escape(r["note"])}</div>')
         o.append("</div>")
 
+    o.append(SIGNUP)
+
     o.append("</main><footer><b>How to read this.</b> Both numbers are the "
              "expected home margin. Mine comes from a ridge model on "
              "opponent-adjusted efficiency, quarterback value, the injury "
@@ -193,7 +346,46 @@ def render(season, week, rows, rec, now):
     return "\n".join(o)
 
 
-def build(season=None, week=None, out=OUT):
+POST_W, POST_H = 1080, 1350   # Instagram's 4:5 portrait frame
+
+
+def to_png(src, dest):
+    """Screenshot the post layout to Instagram's 4:5 frame.
+
+    Headless Chrome renders it rather than an image library, so the post is
+    built from the same HTML and CSS as the page and the two cannot drift apart.
+
+    The window is asked for taller than the frame on purpose: Chrome reserves
+    part of --window-size for browser chrome, leaving a viewport ~87px short,
+    and anything below that viewport is never painted -- which silently cut the
+    footer off the first version of this image. Rendering tall and cropping the
+    top is exact regardless of how much Chrome reserves.
+    """
+    chrome = next((c for c in ("google-chrome", "chromium", "chromium-browser")
+                   if shutil.which(c)), None)
+    if not chrome:
+        print("no chrome found, skipping the image")
+        return False
+    raw = dest + ".raw.png"
+    cmd = [chrome, "--headless=new", "--disable-gpu", "--no-sandbox",
+           "--hide-scrollbars", "--force-device-scale-factor=1",
+           f"--window-size={POST_W},{POST_H + 200}", f"--screenshot={raw}",
+           "--default-background-color=0f1115", f"file://{src}"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(raw):
+        print(f"chrome could not render the image: {r.stderr.strip()[:200]}")
+        return False
+    if Image is None:
+        os.replace(raw, dest)
+        print(f"pillow missing: {dest} is uncropped, check it before posting")
+        return False
+    with Image.open(raw) as im:
+        im.crop((0, 0, POST_W, POST_H)).save(dest)
+    os.remove(raw)
+    return True
+
+
+def build(season=None, week=None, out=OUT, image=True):
     df = game_model.build(*game_model.load())
     if season is None or week is None:
         season, week = game_model.next_slate(df)
@@ -212,12 +404,19 @@ def build(season=None, week=None, out=OUT):
             for r in slate.itertuples()]
     rows.sort(key=lambda r: r["kick"])
 
-    page = render(season, week, rows, last_week(df, season, week),
-                  datetime.datetime.now(PACIFIC))
+    rec = last_week(df, season, week)
+    now = datetime.datetime.now(PACIFIC)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as fh:
-        fh.write(page)
+        fh.write(render(season, week, rows, rec, now))
     print(f"wrote {out}: {len(rows)} games")
+    if image:
+        shot = os.path.splitext(out)[0] + "_post.html"
+        with open(shot, "w") as fh:
+            fh.write(post_render(season, week, rows, rec, now))
+        png = os.path.splitext(out)[0] + ".png"
+        if to_png(shot, png):
+            print(f"wrote {png}")
     return out
 
 
@@ -226,5 +425,7 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--season", type=int)
     ap.add_argument("--week", type=int)
+    ap.add_argument("--no-image", action="store_true",
+                    help="skip the Instagram screenshot")
     a = ap.parse_args()
-    build(a.season, a.week, a.out)
+    build(a.season, a.week, a.out, image=not a.no_image)
