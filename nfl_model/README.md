@@ -224,7 +224,41 @@ disagreements concentrate on rushing quarterbacks and goal-line backs, i.e.
 short-yardage role, which neither snap share nor season-long goal-line share
 captures for week 1.
 
-## 5. `week_log.py` — the public record
+## 5. `injuries.py` — pricing the injury report
+
+```bash
+python3 injuries.py                  # writes data/injury_burden.csv
+```
+
+Counting injured bodies measures nothing: a team can list eight names and lose
+nobody who plays. Each player on the report is instead weighted by the snap
+share he had been taking, and by how often his designation actually sits (Out
+1.0, Doubtful 0.75, Questionable 0.25). The quarterback is excluded because he
+is already a first-class model input.
+
+Two joins are worth knowing about, because both were wrong on the first pass:
+
+- The injury feed keys players by `gsis_id`, the snap feed by `pfr_id`, so they
+  go through nflverse's player crosswalk. Name matching linked 29% of rows; the
+  crosswalk links 96.5%.
+- A player who is Out has no snap row for the game he missed, so the share
+  cannot be looked up by week — it walks back to his most recent cumulative
+  average, then to last season's. Without that the players who matter most are
+  exactly the ones missing from the join.
+
+**Measured effect, 1,962 held-out games:** correctly signed and statistically
+real — the away team missing more of its offense lifts the home margin by 0.60
+points per standard deviation (z = 2.9), defense 0.48 (z = 2.3), which ranks
+them behind only the efficiency metrics and the quarterback. **But accuracy does
+not improve:** margin MAE 10.247 → 10.232, totals unchanged, ATS 48.9% → 48.2%.
+The effect is real and too small to see through 10 points of noise. Kept in the
+design matrix, since the case it exists for is the one game where a team is
+missing three starters.
+
+Known limitation: all snaps are valued equally, so a left tackle and a fourth
+receiver at the same snap share count the same.
+
+## 6. `week_log.py` — the public record
 
 ```bash
 bash fetch_data.sh          # refresh the nflverse data first

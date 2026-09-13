@@ -8,6 +8,9 @@ BASE=https://github.com/nflverse/nflverse-data/releases/download
 
 curl -fsSL -o "$DIR/games.csv" http://www.habitatring.com/games.csv
 
+# player id crosswalk: the injury feed keys on gsis_id, snap counts on pfr_id
+curl -fsSL -o "$DIR/players.csv" "$BASE/players/players.csv"
+
 # weekly player stats: one combined file through 2024, per-season files after
 curl -fsSL -o "$DIR/player_stats.csv" "$BASE/player_stats/player_stats.csv"
 for year in 2025 2026; do

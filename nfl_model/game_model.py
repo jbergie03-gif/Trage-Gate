@@ -38,6 +38,7 @@ from ratings import Ratings
 DATA = os.environ.get("NFL_DATA", "/home/ubuntu/nflmodel/data")
 GAMES = os.path.join(DATA, "games.csv")
 TEAM_GAMES = os.path.join(DATA, "team_games.csv")
+INJURIES = os.path.join(DATA, "injury_burden.csv")
 ET = zoneinfo.ZoneInfo("America/New_York")
 ALPHAS = np.logspace(-2, 3, 24)
 
@@ -59,6 +60,7 @@ FEATURES = [
     *[f"sum_{m}" for m in TEND],
     *[f"diff_{m}" for m in TEND],
     "qb_diff", "qb_new_home", "qb_new_away",
+    "inj_off_diff", "inj_def_diff", "inj_total",
     "rest_diff", "short_week_home", "short_week_away",
     "bye_home", "bye_away",
     "dist_away", "dist_home", "tz_shift_away", "tz_shift_home",
@@ -132,11 +134,25 @@ def load():
     g = g[g["game_type"].isin(["REG", "WC", "DIV", "CON", "SB"])]
     g = g[g["season"] >= 2016].copy()
     tg = pd.read_csv(TEAM_GAMES)
-    return g, tg
+    inj = (pd.read_csv(INJURIES) if os.path.exists(INJURIES)
+           else pd.DataFrame(columns=["season", "week", "team",
+                                      "inj_off", "inj_def"]))
+    return g, tg, inj
 
 
-def build(g, tg):
+def injury_lookup(inj):
+    """(season, week, team) -> snap share missing on each side of the ball.
+
+    Absent from the table means nobody of consequence was listed, which is a
+    real zero rather than a gap, so the model reads it as a healthy team.
+    """
+    return {(r.season, r.week, r.team): (r.inj_off, r.inj_def)
+            for r in inj.itertuples()}
+
+
+def build(g, tg, inj=None):
     tg_by_game = {k: v.to_dict("records") for k, v in tg.groupby("game_id")}
+    hurt = injury_lookup(inj) if inj is not None else {}
     r = Ratings()
     rows = []
     g = g.sort_values(["season", "week", "gameday", "gametime"])
@@ -152,6 +168,10 @@ def build(g, tg):
             tend[f"diff_{m}"] = r.t(m, home) - r.t(m, away)
         qh = r.qb_rating(row.get("home_qb_id"))
         qa = r.qb_rating(row.get("away_qb_id"))
+
+        key = (row["season"], row["week"])
+        ih_off, ih_def = hurt.get(key + (home,), (0.0, 0.0))
+        ia_off, ia_def = hurt.get(key + (away,), (0.0, 0.0))
 
         tv = travel(row)
         wind = row["wind"]
@@ -176,6 +196,11 @@ def build(g, tg):
             qb_diff=qh - qa,
             qb_new_home=1 if r.qb_seen(row.get("home_qb_id")) < 200 else 0,
             qb_new_away=1 if r.qb_seen(row.get("away_qb_id")) < 200 else 0,
+            # Signed so positive favours the home team: the away side missing
+            # more of its offense should lift the home margin.
+            inj_off_diff=ia_off - ih_off,
+            inj_def_diff=ia_def - ih_def,
+            inj_total=ih_off + ih_def + ia_off + ia_def,
             rest_diff=(row["home_rest"] or 7) - (row["away_rest"] or 7),
             short_week_home=1 if row["home_rest"] <= 4 else 0,
             short_week_away=1 if row["away_rest"] <= 4 else 0,
@@ -309,8 +334,8 @@ def main():
     ap.add_argument("--save", action="store_true")
     a = ap.parse_args()
 
-    g, tg = load()
-    df = build(g, tg)
+    g, tg, inj = load()
+    df = build(g, tg, inj)
     if a.save:
         out = os.path.join(DATA, "game_features.csv")
         df.to_csv(out, index=False)
