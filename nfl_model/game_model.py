@@ -328,6 +328,36 @@ def summarize(p):
                   f"{(s.spread_line-s.result).abs().mean():.2f}")
 
 
+def predict_slate(df, season=None, week=None, gameday=None):
+    """Fit on every completed game, predict one slate. The live entry point.
+
+    Refit on each call rather than pickling a model: the ratings in `df` move
+    every week anyway, so a stored model would be fit on stale inputs.
+    """
+    done = df[df["result"].notna() & df["spread_line"].notna()
+              & df["total_line"].notna()]
+    up = df[df["gameday"] == gameday] if gameday else \
+        df[(df["season"] == season) & (df["week"] == week)]
+    up = up[up["spread_line"].notna()].copy()
+    if up.empty:
+        return up
+    Xtr = done[FEATURES].values
+    up["pred_margin"] = ridge().fit(Xtr, done["result"].values) \
+        .predict(up[FEATURES].values)
+    up["pred_total"] = ridge().fit(Xtr, done["total"].values) \
+        .predict(up[FEATURES].values)
+    return up.sort_values("gameday")
+
+
+def next_slate(df):
+    """(season, week) of the earliest unplayed week with a posted line."""
+    up = df[df["result"].isna() & df["spread_line"].notna()]
+    if up.empty:
+        return None, None
+    season = int(up["season"].min())
+    return season, int(up[up["season"] == season]["week"].min())
+
+
 def coefficients(df, target="result", boots=400, seed=0):
     """Ridge coefficients with bootstrap intervals.
 
@@ -387,13 +417,7 @@ def main():
         coefficients(df, "total")
 
     if a.predict:
-        done = df[df["result"].notna() & df["total_line"].notna()]
-        up = df[df["gameday"] == a.predict]
-        mm = ridge().fit(done[FEATURES].values, done["result"].values)
-        tm = ridge().fit(done[FEATURES].values, done["total"].values)
-        up = up.copy()
-        up["pred_margin"] = mm.predict(up[FEATURES].values)
-        up["pred_total"] = tm.predict(up[FEATURES].values)
+        up = predict_slate(df, gameday=a.predict)
         print(f"{'game':14s} {'model':>7s} {'line':>7s} {'edge':>6s} "
               f"{'m_tot':>6s} {'tot':>6s}  score")
         for _, r in up.iterrows():
