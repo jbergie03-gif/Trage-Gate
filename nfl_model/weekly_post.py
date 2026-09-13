@@ -208,14 +208,19 @@ font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 padding:44px 48px;display:flex;flex-direction:column;overflow:hidden}
 h1{font-size:48px;letter-spacing:-.03em;line-height:1.05;flex-shrink:0}
 .sub{color:var(--dim);font-size:20px;margin-top:8px;flex-shrink:0}
-.legend{display:flex;gap:20px;font-size:18px;margin:18px 0 10px;flex-shrink:0}
-.legend b{font-weight:600}
-.legend .m{color:var(--market)}
-.legend .p{color:var(--model)}
+/* The column labels sit in the same grid as the rows so each one lands over
+   the numbers it names. */
+.head,.r{display:grid;grid-template-columns:1fr 128px 128px 90px;gap:12px;
+padding:0 19px}
+.head{font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+font-weight:600;margin:20px 0 8px;flex-shrink:0}
+.head div:not(:first-child){text-align:right}
+.head .m{color:var(--market)}
+.head .p{color:var(--model)}
+.head .g{color:var(--dim)}
 .rows{flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-height:0}
 .r{background:var(--card);border:1px solid var(--line);border-radius:12px;
-padding:0 18px;display:grid;grid-template-columns:1fr 128px 128px 90px;
-align-items:center;gap:12px;flex:1 1 0;min-height:0;overflow:hidden}
+align-items:center;flex:1 1 0;min-height:0;overflow:hidden}
 .t{font-size:23px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;
 overflow:hidden;text-overflow:ellipsis}
 .t span{color:var(--dim);font-weight:400;font-size:19px;margin:0 7px}
@@ -248,9 +253,8 @@ def post_render(season, week, rows, rec, now):
          f"<h1>Week {week}: my model vs the market</h1>",
          f'<div class="sub">All {len(rows)} games \u00b7 posted '
          f"{now:%A %B %-d} \u00b7 before kickoff</div>",
-         '<div class="legend"><b class="m">Vegas</b>'
-         '<b class="p">My model</b>'
-         '<b style="color:#9aa0ac">Gap</b></div>',
+         '<div class="head"><div></div><div class="m">Vegas</div>'
+         '<div class="p">My model</div><div class="g">Gap</div></div>',
          '<div class="rows">']
 
     for r in rows:
