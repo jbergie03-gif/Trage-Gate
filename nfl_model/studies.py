@@ -11,12 +11,14 @@ the team.
 Every cell prints its sample size, and a standard error so a 56% on 40 games
 is visibly not the same claim as a 56% on 400.
 
-Run: python3 studies.py [--travel] [--primetime] [--coaches] [--totals] [--all]
+Run: python3 studies.py [--travel] [--primetime] [--coaches] [--totals]
+                        [--baseline] [--leak] [--all]
 """
 import argparse
 import math
 import os
 
+import numpy as np
 import pandas as pd
 
 DATA = os.environ.get("NFL_DATA", "/home/ubuntu/nflmodel/data")
@@ -215,14 +217,112 @@ def totals(min_season=1999):
         print(f"  {start}-{start+9}  under {p*100:5.1f}%  n={len(live)}")
 
 
+def baseline():
+    """What the model must beat before the market is even worth discussing.
+
+    Scoring the model only against the closing line flatters it: the line is a
+    hard bar, so losing to it looks respectable. The bar that decides whether
+    the features earn their keep is a constant -- every game predicted at the
+    league's average home margin, every total at the league average. Both
+    constants use prior games only, so they are themselves out of sample.
+    """
+    import game_model
+
+    df = game_model.build(*game_model.load())
+    p = (game_model.fit_report(df)
+         .dropna(subset=["result", "total", "spread_line", "total_line"])
+         .sort_values(["season", "week"]).reset_index(drop=True))
+
+    def mae(pred, actual):
+        return float(np.abs(pred - actual).mean())
+
+    prior_margin = p["result"].expanding().mean().shift(1).fillna(0)
+    prior_total = (p["total"].expanding().mean().shift(1)
+                   .fillna(p["total"].mean()))
+
+    print(f"out-of-sample games: {len(p)}\n")
+    print("margin, mean absolute error")
+    for name, pred in [("pick'em (always 0)", 0.0),
+                       ("always home by 2.5", 2.5),
+                       ("prior-games home margin", prior_margin),
+                       ("model", p["pred_margin"]),
+                       ("closing spread", p["spread_line"])]:
+        print(f"  {name:26s} {mae(pred, p['result']):6.2f}")
+
+    print("\ntotal, mean absolute error")
+    for name, pred in [("prior-games league mean", prior_total),
+                       ("model", p["pred_total"]),
+                       ("closing total", p["total_line"])]:
+        print(f"  {name:26s} {mae(pred, p['total']):6.2f}")
+
+    print("\nstraight up")
+    for name, pick in [("always the home team", p["result"] > 0),
+                       ("model", (p["pred_margin"] > 0) == (p["result"] > 0)),
+                       ("closing spread",
+                        (p["spread_line"] > 0) == (p["result"] > 0))]:
+        print(f"  {name:26s} {pick.mean() * 100:5.1f}%")
+
+    # Share of the distance from constant to market that the features close.
+    # Reported because the raw error gaps read as small either way.
+    for label, dumb, mdl, mkt in [
+            ("margin", mae(prior_margin, p["result"]),
+             mae(p["pred_margin"], p["result"]),
+             mae(p["spread_line"], p["result"])),
+            ("total", mae(prior_total, p["total"]),
+             mae(p["pred_total"], p["total"]),
+             mae(p["total_line"], p["total"]))]:
+        print(f"\n{label}: constant {dumb:.2f} -> model {mdl:.2f} -> "
+              f"market {mkt:.2f}; features close "
+              f"{(dumb - mdl) / (dumb - mkt) * 100:.0f}% of the gap")
+
+
+def leak_ablation():
+    """Refit without the features that are not fully knowable pre-kickoff.
+
+    games.csv carries observed game-time weather rather than the forecast, and
+    its starting-QB column is the quarterback who actually took the first snap.
+    Both are hindsight in a backtest. If dropping them barely moves the error
+    the backtest is not being carried by hindsight; if it moves a lot, every
+    number quoted from it is inflated.
+    """
+    import game_model
+
+    df = game_model.build(*game_model.load())
+    full = list(game_model.FEATURES)
+    cuts = [("full model", full),
+            ("no observed weather", [f for f in full
+                                     if f not in ("wind", "cold")]),
+            ("no QB features", [f for f in full
+                                if not f.startswith("qb_")]),
+            ("neither", [f for f in full if f not in ("wind", "cold")
+                         and not f.startswith("qb_")])]
+    try:
+        for name, feats in cuts:
+            game_model.FEATURES = feats
+            p = game_model.fit_report(df)
+            su = ((p.pred_margin > 0) == (p.result > 0)).mean() * 100
+            print(f"  {name:22s} margin MAE "
+                  f"{np.abs(p.pred_margin - p.result).mean():.3f}   "
+                  f"total MAE {np.abs(p.pred_total - p.total).mean():.3f}   "
+                  f"SU {su:.1f}%")
+    finally:
+        game_model.FEATURES = full
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--travel", action="store_true")
     ap.add_argument("--primetime", action="store_true")
     ap.add_argument("--coaches", action="store_true")
     ap.add_argument("--totals", action="store_true")
+    ap.add_argument("--baseline", action="store_true")
+    ap.add_argument("--leak", action="store_true")
     ap.add_argument("--all", action="store_true")
     a = ap.parse_args()
+    if a.baseline or a.all:
+        baseline()
+    if a.leak or a.all:
+        leak_ablation()
     df = pd.read_csv(FEATURES)
     if a.travel or a.all:
         travel(df)
