@@ -92,6 +92,23 @@ and `/tmp/week_post.html` that it is rendered from. The image is a separate
 dense layout rather than a screenshot of the page: a 16-game slate does not fit
 in a 4:5 frame one card at a time. `--no-image` skips it.
 
+## Publishing the pick sheet
+
+Same idea: `../picksheet_build.py` generates `../picksheet/index.html` from
+`../picksheet/template.html`, the schedule and the latest DraftKings snapshot,
+then the file is copied up. It builds **every** game of the week — the sheet was
+hand-written for week 1 and the Thursday, Sunday-night and Monday-night games
+were left off it, so three games could not be picked at all.
+
+```bash
+python3 ../picksheet_build.py            # current week, or --season/--week
+scp ../picksheet/index.html root@<host>:/opt/nfl-cards/
+```
+
+A game whose kickoff has passed renders locked, and a game the book has not
+priced yet renders as "no line yet" instead of being dropped. Rerun once the
+line posts.
+
 Changes to `server.py` do need a restart:
 
 ```bash
