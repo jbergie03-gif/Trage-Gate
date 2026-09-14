@@ -104,11 +104,16 @@ def clean(card):
     for p in picks:
         if not isinstance(p, dict):
             raise ValueError("each pick must be an object")
-        out.append({
-            "game": str(p.get("game", ""))[:20],
-            "side": str(p.get("side", ""))[:20],
-            "double": bool(p.get("double", False)),
-        })
+        # Canonical "AWAY@HOME": "NE @ SEA" is the same game, and if it is
+        # stored differently it dodges the kickoff check and reads as a
+        # separate game when the card is scored.
+        game = re.sub(r"\s+", "", str(p.get("game", "")))[:20]
+        side = str(p.get("side", ""))[:20].strip()
+        teams = game.split("@")
+        if side and len(teams) == 2 and side.split(" ")[0] not in teams:
+            raise ValueError(f"{side!r} is not a team in {game}")
+        out.append({"game": game, "side": side,
+                    "double": bool(p.get("double", False))})
     return {
         "slate": str(card.get("slate", ""))[:20],
         "who": str(card.get("who", "jonathan"))[:40],
