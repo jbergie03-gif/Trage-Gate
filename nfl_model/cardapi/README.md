@@ -102,12 +102,20 @@ were left off it, so three games could not be picked at all.
 
 ```bash
 python3 ../picksheet_build.py            # current week, or --season/--week
-scp ../picksheet/index.html root@<host>:/opt/nfl-cards/
+scp ../picksheet/index.html ../picksheet/kickoffs.json root@<host>:/opt/nfl-cards/
 ```
 
 A game whose kickoff has passed renders locked, and a game the book has not
 priced yet renders as "no line yet" instead of being dropped. Rerun once the
 line posts.
+
+`kickoffs.json` goes up with the sheet because the lock has to hold on the
+server too. The page recomputes it from the clock on every render, so a tab
+left open through kickoff locks itself — but localStorage is editable and
+`/card` is a plain POST, and adversarial testing got a kicked-off game into the
+record through both. `POST /card` now answers **409** naming the offending
+games and files nothing. A slate missing from the file is unenforced rather
+than closed, so forgetting to copy it up costs the guarantee, not the sheet.
 
 Changes to `server.py` do need a restart:
 

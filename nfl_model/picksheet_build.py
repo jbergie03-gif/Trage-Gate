@@ -110,14 +110,14 @@ def rows(df, season, week, stars=STARS, now=None):
         g = dict(away=r.away_team, home=r.home_team,
                  day=kick.strftime("%A"),
                  kick=kick.strftime("%a %-I:%M %p PT"),
+                 kickAt=kick.isoformat(),
                  _kick=kick)
         if pd.isna(spread) or pd.isna(total) or r.game_id not in pred:
             # Shown anyway, unpickable. Dropping a game for having no line is
             # how a game goes missing from the sheet, which is the bug this
             # file exists to prevent -- regenerate once the book posts it.
             out.append(dict(g, spread=None, total=None, devin="",
-                            devinNote="no line posted", locked=True,
-                            why="kicked off" if started else "no line yet",
+                            devinNote="no line posted", _locked=True,
                             _edge=-1))
             continue
         edge = pred[r.game_id] - spread
@@ -128,11 +128,11 @@ def rows(df, season, week, stars=STARS, now=None):
             g, spread=round(float(spread), 1), total=round(float(total), 1),
             devin=f"{team} {'+' if num > 0 else ''}{num:.1f}",
             devinNote=note(edge),
-            locked=started, why="kicked off \u2014 locked",
+            _locked=started,
             _edge=abs(edge),
         ))
     out.sort(key=lambda g: g["_kick"])
-    for g in sorted((g for g in out if not g["locked"]),
+    for g in sorted((g for g in out if not g["_locked"]),
                     key=lambda g: -g["_edge"])[:stars]:
         g["devinDouble"] = True
     for g in out:
@@ -152,7 +152,7 @@ def build(season=None, week=None, out=OUT, stars=STARS):
     if not games:
         print(f"no games with a line for {season} week {week}")
         return None
-    if not any(not g["locked"] for g in games) and auto:
+    if not any(not g["_locked"] for g in games) and auto:
         # Every game of that week is played; the sheet people want is next
         # week's. next_slate() still names the old week until the results land.
         print(f"{season} week {week} is over, building week {week + 1}")
@@ -160,7 +160,7 @@ def build(season=None, week=None, out=OUT, stars=STARS):
         if nxt:
             games, week = nxt, week + 1
 
-    live = [g for g in games if not g["locked"]]
+    live = [g for g in games if not g["_locked"]]
     pending = [g for g in games if g["spread"] is None]
     for g in pending:
         print(f"no line yet for {g['away']}@{g['home']} ({g['kick']})")
@@ -169,10 +169,15 @@ def build(season=None, week=None, out=OUT, stars=STARS):
     doubles = min(stars, len(live))
     scoring = (f"{len(live)} game(s) still open of {len(games)} this week, "
                f"{len(live) + doubles} points available.")
+    # The sheet recomputes locked from kickAt against the reader's clock, so
+    # the build-time flag is a build detail and does not ship.
+    for g in games:
+        del g["_locked"]
     with open(TEMPLATE) as fh:
         page = fh.read()
+    slate = f"{season}-w{week:02d}"
     for key, val in (("__TITLE__", title),
-                     ("__SLATE__", f"{season}-w{week:02d}"),
+                     ("__SLATE__", slate),
                      ("__TAKEN__", stamp or "the schedule, no DK snapshot"),
                      ("__SCORING__", scoring),
                      ("__MAX_STARS__", str(doubles)),
@@ -180,9 +185,16 @@ def build(season=None, week=None, out=OUT, stars=STARS):
         page = page.replace(key, val)
     with open(out, "w") as fh:
         fh.write(page)
+    # Kickoff times for the card API to enforce, since the page's own lock is
+    # JavaScript over editable storage and /card can be POSTed directly.
+    locks = os.path.join(os.path.dirname(os.path.abspath(out)),
+                         "kickoffs.json")
+    with open(locks, "w") as fh:
+        json.dump({slate: {f"{g['away']}@{g['home']}": g["kickAt"]
+                           for g in games}}, fh, indent=2)
     kicked = len(games) - len(live) - len(pending)
-    print(f"wrote {out}: {len(games)} games, {kicked} already kicked off, "
-          f"{len(pending)} waiting on a line")
+    print(f"wrote {out} and {locks}: {len(games)} games, "
+          f"{kicked} already kicked off, {len(pending)} waiting on a line")
     return out
 
 

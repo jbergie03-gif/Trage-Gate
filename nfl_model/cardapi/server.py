@@ -32,6 +32,11 @@ CARDS = os.path.join(DATA_DIR, "cards.jsonl")
 SUBS = os.path.join(DATA_DIR, "subscribers.jsonl")
 SECRET_FILE = os.path.join(DATA_DIR, "subscriber_secret")
 SHEET = os.environ.get("PICKSHEET", os.path.join(ROOT, "index.html"))
+# Kickoff times for the sheet's slate, written beside it by picksheet_build.
+# The card is only worth anything if the pick was in before kickoff, and the
+# page cannot be the thing that guarantees that: its lock is JavaScript over
+# editable localStorage, and /card is a plain POST anyone can replay.
+KICKOFFS = os.environ.get("KICKOFFS", os.path.join(ROOT, "kickoffs.json"))
 # The published week page, uploaded by weekly_post.py. Served rather than
 # generated: fitting the model needs ~520 MB and the box has 458 MB.
 WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
@@ -53,6 +58,35 @@ def read_cards():
         return [json.loads(line) for line in fh if line.strip()]
 
 
+def kickoffs():
+    """{slate: {"AWAY@HOME": kickoff}}, or {} when the file is missing.
+
+    Missing means unenforced rather than closed: an old sheet whose slate has
+    no entry still submits. Read per request so a redeployed sheet takes
+    effect without a restart, same as the week page.
+    """
+    try:
+        with open(KICKOFFS) as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for slate, games in raw.items():
+        out[slate] = {g: datetime.datetime.fromisoformat(t)
+                      for g, t in games.items()}
+    return out
+
+
+def too_late(card):
+    """Games on the card that had already started. Empty is the good case."""
+    games = kickoffs().get(card["slate"], {})
+    if not games:
+        return []
+    now = datetime.datetime.now(PACIFIC)
+    return [p["game"] for p in card["picks"]
+            if p["game"] in games and games[p["game"]] <= now]
+
+
 def clean(card):
     """Reject anything that isn't a card, and cap every field's length.
 
@@ -70,11 +104,16 @@ def clean(card):
     for p in picks:
         if not isinstance(p, dict):
             raise ValueError("each pick must be an object")
-        out.append({
-            "game": str(p.get("game", ""))[:20],
-            "side": str(p.get("side", ""))[:20],
-            "double": bool(p.get("double", False)),
-        })
+        # Canonical "AWAY@HOME": "NE @ SEA" is the same game, and if it is
+        # stored differently it dodges the kickoff check and reads as a
+        # separate game when the card is scored.
+        game = re.sub(r"\s+", "", str(p.get("game", "")))[:20]
+        side = str(p.get("side", ""))[:20].strip()
+        teams = game.split("@")
+        if side and len(teams) == 2 and side.split(" ")[0] not in teams:
+            raise ValueError(f"{side!r} is not a team in {game}")
+        out.append({"game": game, "side": side,
+                    "double": bool(p.get("double", False))})
     return {
         "slate": str(card.get("slate", ""))[:20],
         "who": str(card.get("who", "jonathan"))[:40],
@@ -335,6 +374,15 @@ class Handler(BaseHTTPRequestHandler):
             card = clean(json.loads(self.rfile.read(length)))
         except (ValueError, json.JSONDecodeError) as exc:
             return self._send(400, {"error": str(exc)})
+        late = too_late(card)
+        if late:
+            # Rejected whole rather than silently dropping the late games: a
+            # card that quietly differs from what was sent is worse than one
+            # that fails loudly.
+            return self._send(409, {
+                "error": "kickoff has passed for " + ", ".join(sorted(late)),
+                "late": sorted(late),
+            })
 
         row = {"submitted_at_pt": datetime.datetime.now(PACIFIC).isoformat(timespec="seconds"), **card}
         os.makedirs(DATA_DIR, exist_ok=True)
