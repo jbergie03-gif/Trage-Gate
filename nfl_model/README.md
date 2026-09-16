@@ -5,7 +5,9 @@ Two questions, answered with measurements rather than assertions:
 1. Can a cheap ratings model beat the closing spread? **No.**
 2. Which NFL markets are loose enough to be worth modelling at all?
 
-Read-only, public data, no credentials, no order placement.
+Read-only, no order placement. Public data throughout, with one exception:
+`fantasyguru_pull.py` signs into Jonathan's paid Fantasy Guru account, with
+their written permission and on a leash (section 9).
 
 ## 1. `elo.py` — game model vs the closing line
 
@@ -391,8 +393,51 @@ week-1 favorite result, and driven by the same 16-games-a-year sample.
 model knows slightly more about totals than about sides, and "slightly more"
 is a quarter of a point.
 
+## 9. `fantasyguru_pull.py` — the one paid feed
+
+Fantasy Guru has no API. Their support (Rusty, 2026-09-12) wrote that
+subscribers may feed the CSV/Excel downloads to a model, with one condition:
+
+> If you tell it to rate limit the pulls, to say once a day or once an hour
+> depending on the data you need, that is fine. If you need it to pull every 10
+> minutes before lock or something that is fine too. It only becomes an issue
+> when we have members who will hit it constantly.
+
+So the interval is enforced in code, not in a habit: each dataset writes a
+timestamp to `last_pull.json` and a run inside the window prints how long is
+left and exits without touching the site.
+
+```bash
+export FANTASYGURU_USER=... FANTASYGURU_PASS=...   # never committed
+python3 fantasyguru_pull.py                        # once a day, both sets
+python3 fantasyguru_pull.py --dataset props --min-interval 600   # near lock
+python3 fantasyguru_pull.py --force                # deliberate override
+```
+
+Downloads go to `~/fgdata/<set>/<date>/` — outside the repo, because it is a
+paid feed and not ours to republish. The login session is cached in a persistent
+browser profile there too, so repeat runs do not re-authenticate.
+
+What is actually available, having walked all 88 subscriber pages:
+
+| Set | Source | Rows | Worth |
+|---|---|---|---|
+| `props` | `/nfl-player-props` | ~1,150 across 13 markets | **The reason to do this.** Every prop priced at FanDuel, BetMGM, Caesars, Fanatics and a consensus — a cross-book comparison nflverse cannot produce |
+| `rankings` | `/jeff-mans-nfl-weekly-rankings-ppr` | ~220 across 6 positions | Thin: rank, player, team, bye, opponent. No projection column |
+
+The stat pages under `/data/nfl` — team stats, player stats, injuries, SMASH
+reports — are Sportradar widgets with no export button and no underlying JSON of
+our own to read, so there is nothing to pull there. That rules out the thing that
+would have helped the game model most; what we got instead is a props feed.
+
+Unverified so far: whether any of it improves a model. The props file is a
+market snapshot, so its first use is measuring our own prop numbers against five
+books at once, not adding a feature.
+
 ## Data sources
 
+- Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
+  prop lines and weekly fantasy rankings.
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
   closing spread/total/moneyline, 1999–present.
 - [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases) —
