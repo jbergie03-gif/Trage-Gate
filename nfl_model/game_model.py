@@ -150,7 +150,7 @@ def injury_lookup(inj):
             for r in inj.itertuples()}
 
 
-def build(g, tg, inj=None):
+def build(g, tg, inj=None, with_ratings=False):
     tg_by_game = {k: v.to_dict("records") for k, v in tg.groupby("game_id")}
     hurt = injury_lookup(inj) if inj is not None else {}
     r = Ratings()
@@ -221,7 +221,11 @@ def build(g, tg, inj=None):
         if played and pd.notna(row["result"]):
             r.update_game(played)
 
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    # The ratings object is the pre-game state after every finished game, so a
+    # caller that wants to ask "what if a different quarterback starts" can
+    # look up his rating without replaying the league a second time.
+    return (out, r) if with_ratings else out
 
 
 def fit_report(df, first_test=2019):

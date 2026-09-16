@@ -434,6 +434,44 @@ Unverified so far: whether any of it improves a model. The props file is a
 market snapshot, so its first use is measuring our own prop numbers against five
 books at once, not adding a feature.
 
+## 10. `input_check.py` — fact-check the inputs before publishing
+
+Week 2 was published with Atlanta favoured by 5.1 on a schedule row that listed
+Tua Tagovailoa as their starter. He had not practised all week. The arithmetic
+was fine; the input was three days stale, and nothing in the build said so.
+
+The model cannot read news — a feature has to be a number, and a number has to
+be testable against past seasons before it earns a coefficient. What *can* be
+automated is checking that the numbers it was handed still match reality:
+
+```bash
+python3 input_check.py --season 2026 --week 2
+python3 input_check.py --season 2026 --week 2 --swap ATL="Cooper Rush"
+```
+
+Per slate it reports how old each feed is, how much of the injury report the
+model is actually carrying, and for every announced starter whether the injury
+report contradicts him, whether he differs from whoever took the snaps in that
+team's last game, and whether he has enough career dropbacks to be rated at all.
+
+Every flag comes with the number it is worth: the row is re-run with the most
+likely replacement — the roster quarterback with the most career dropbacks who
+is not ruled out — and both edges are printed. Week 2's two flags:
+
+| Game | Assumed | Actually | Edge | If replaced |
+|---|---|---|---:|---:|
+| CAR @ ATL | Tua Tagovailoa | did not start week 1, no practice | +7.6 ATL | +5.7 (Cooper Rush) |
+| MIN @ CHI | Kyler Murray | concussion protocol, Wentz started week 1 | +3.5 MIN | +2.5 (Carson Wentz) |
+
+`picksheet_build.py` runs the check after writing the sheet and prints it, so a
+stale input has to be read past rather than discovered afterwards. It writes
+`picksheet/input_check.md` and **never edits a pick** — a published card is a
+record, and the decision to revise one stays with a person.
+
+What it deliberately does not do: score coaching changes, locker-room reports or
+last week's headlines. There is no historical version of that text to test
+against, so any weight put on it would be a guess wearing a model's clothes.
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player

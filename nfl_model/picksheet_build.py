@@ -24,6 +24,7 @@ import zoneinfo
 import pandas as pd
 
 import game_model
+import input_check
 import weekly_post
 
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -140,7 +141,7 @@ def rows(df, season, week, stars=STARS, now=None):
     return out, stamp
 
 
-def build(season=None, week=None, out=OUT, stars=STARS):
+def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
     df = game_model.build(*game_model.load())
     auto = season is None or week is None
     if auto:
@@ -195,6 +196,20 @@ def build(season=None, week=None, out=OUT, stars=STARS):
     kicked = len(games) - len(live) - len(pending)
     print(f"wrote {out} and {locks}: {len(games)} games, "
           f"{kicked} already kicked off, {len(pending)} waiting on a line")
+
+    # The sheet is only as good as what the model was told. Week 2 was built
+    # on a schedule file that had Tua Tagovailoa starting for Atlanta while he
+    # had not practiced all week, and nothing in the build said so. Now the
+    # check runs every time and prints, so a stale input has to be read past
+    # rather than discovered afterwards.
+    if fact_check:
+        report = input_check.check(season, week, game_model.DATA)
+        path = os.path.join(os.path.dirname(os.path.abspath(out)),
+                            "input_check.md")
+        with open(path, "w") as fh:
+            fh.write("\n".join(report) + "\n")
+        print("\n" + "\n".join(report))
+        print(f"wrote {path}")
     return out
 
 
@@ -204,5 +219,7 @@ if __name__ == "__main__":
     ap.add_argument("--season", type=int)
     ap.add_argument("--week", type=int)
     ap.add_argument("--stars", type=int, default=STARS)
+    ap.add_argument("--no-check", action="store_true",
+                    help="skip the input fact-check")
     a = ap.parse_args()
-    build(a.season, a.week, a.out, a.stars)
+    build(a.season, a.week, a.out, a.stars, fact_check=not a.no_check)
