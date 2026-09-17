@@ -519,7 +519,7 @@ from the top of the week page. Missing notes answer with a page pointing back
 at the numbers rather than with a 404 body, since a reader can arrive from that
 link before the week's notes exist.
 
-## 12. Offensive line: can a lineman be rated from free data? **No.**
+## 12. Offensive line: rating one lineman fails, counting absent starters works
 
 The model docks a team the same amount for any missing non-quarterback, so a
 left tackle and a fourth safety cost the same. The obvious repair is to rate
@@ -532,6 +532,7 @@ python3 ol_study.py                       # unit level: continuity, position cha
 python3 ol_player_study.py --shuffles 20  # player level: on/off vs a shuffled floor
 python3 ol_player_check.py                # does the rating replicate?
 python3 ol_player_check.py --player Kelce # one lineman's game log
+python3 ol_missing.py --source injury     # what an absent starter costs
 ```
 
 **What the free feed contains.** nflverse snap counts give per-game snap share
@@ -581,6 +582,45 @@ and it is the trap this kind of table falls into.
 The named list reads the same way: Jason Kelce and David DeCastro rate near the
 top, which is right, while Dion Dawkins and Orlando Brown Jr. rate near the
 bottom, which is not. **No lineman rating from this data enters the model.**
+
+### But a missing starter does cost points — the market just knows
+
+Rating one lineman fails. Counting how much of the usual five is absent does
+not, and that is the question Jonathan actually asked. `ol_missing.py` marks a
+lineman a starter walk-forward (at least half the snaps in 60% of his team's
+last six games), then weights each absence by his own usual snap share, so a
+never-leaves-the-field tackle costs a full unit and a rotational guard costs a
+fraction. No opinion about who is good is required.
+
+The catch is what "missing" means, and it changes the answer completely:
+
+| `--source` | what it counts | margin | beyond the closing line |
+|---|---|---:|---:|
+| `snaps` | under half the snaps | +1.64 ± 0.30 | **+0.74 ± 0.27** |
+| `inactive` | never dressed | +1.80 ± 0.36 | +0.56 ± 0.32 |
+| `injury` | listed Out/Doubtful | +0.51 ± 0.55 | −0.03 ± 0.49 |
+
+Points of home margin per one missing full-time starter on the away line, over
+2,169 games. The first row looks like a market-beating edge and is not one: a
+team being blown out pulls its starters, so "played under half the snaps"
+is partly an effect of the result, and the regression reads it backwards. The
+clean measures keep the football effect — a line missing a full-time starter
+really is worth roughly 1.5 to 2 points — and lose the edge. Against the
+closing line the only version the model could actually use on Friday scores
+−0.03 ± 0.49: **the market prices missing linemen correctly.**
+
+Blocking moves the way it should under the same measure: pass EPA −0.018 per
+missing starter (t = −2.7) with three or more out costing −0.10, while sack
+rate barely moves. One more caveat on the injury report row — it catches under
+half of the absences the snap counts show (0.19 per game against 0.44), because
+linemen are scratched without ever being designated Out.
+
+Not yet tried, and the best free lead: nflverse
+[participation data](https://nflreadr.nflverse.com/reference/load_participation.html)
+lists every player on the field for every play back to 2016, free under
+CC-BY-SA. That allows a play-level plus-minus instead of a game-level one, which
+is a genuinely stronger estimator. It ships after the postseason, so it can
+build ratings from past years but cannot see the current week.
 
 Paid alternatives were checked rather than assumed. ESPN's pass block win rate
 is real — tracking chips, a 2.5-second survival threshold — but is published as
