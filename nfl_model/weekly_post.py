@@ -110,7 +110,9 @@ font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 -webkit-font-smoothing:antialiased}
 header,main,footer{max-width:660px;margin:0 auto}
 h1{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}
-.sub{color:var(--dim);font-size:13px;margin-bottom:22px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:14px}
+nav{max-width:660px;margin:0 auto 22px;font-size:13px}
+nav a{color:var(--market);margin-right:14px}
 .record{background:var(--card);border:1px solid var(--line);border-radius:14px;
 padding:14px 16px;margin-bottom:22px}
 .record h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;
@@ -291,7 +293,9 @@ def render(season, week, rows, rec, now):
          f"<style>{CSS}</style></head><body>",
          f"<header><h1>Week {week} — model vs the market</h1>",
          f'<div class="sub">Posted {now:%A, %B %-d} at {now:%-I:%M %p} PT'
-         " · every number below was public before kickoff</div></header><main>"]
+         " · every number below was public before kickoff</div></header>",
+         '<nav><a href="/notes">This week\'s scouting notes</a>'
+         '<a href="/">Pick sheet</a></nav><main>']
 
     if rec:
         cells = [("straight up", f"{rec['su']:.0%}"),

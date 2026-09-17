@@ -26,6 +26,7 @@ Two properties are deliberate:
 | GET | `/cards?slate=&who=` | Full submission history |
 | GET | `/health` | Liveness, card count, active subscriber count |
 | GET | `/week` | The weekly model-vs-market page |
+| GET | `/notes` | The week's hand-written scouting notes |
 | POST | `/subscribe` | Email signup: JSON or form `{email, source}` |
 | GET | `/unsubscribe?e=&t=` | One-click opt-out from an email footer |
 | GET | `/subscribers` | Active list, requires `X-Admin-Token` |
@@ -91,6 +92,21 @@ The same command also writes `/tmp/week.png`, the 1080x1350 Instagram frame,
 and `/tmp/week_post.html` that it is rendered from. The image is a separate
 dense layout rather than a screenshot of the page: a 16-game slate does not fit
 in a 4:5 frame one card at a time. `--no-image` skips it.
+
+## Publishing the scouting notes
+
+The week's notes ride up the same way, and the week page links to them from the
+top:
+
+```bash
+python3 ../notes_build.py ../notes/2026-w02.md --caption
+scp ../notes/2026-w02.html root@<host>:/opt/nfl-cards/notes.html
+```
+
+Served at `/notes`, read per request, no restart. Before a week's notes are
+written the path answers with a page pointing back at `/week` rather than a
+JSON error, because the link to it is already on the page. `--caption` also
+writes the Instagram caption next to the source; it is posted by hand.
 
 ## Publishing the pick sheet
 

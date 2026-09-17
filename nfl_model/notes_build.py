@@ -23,6 +23,12 @@ knows yet, written down so it cannot be quietly turned into a fact later.
 `read` is opinion, and it is labelled opinion. A note with a read but no fact
 is the failure mode this format exists to prevent.
 
+A game may also carry a `caption:` line: the same game said in one sentence,
+for the Instagram post that sends people to the page. `--caption` collects
+those into a caption file with the header's `lead` and `tail` around them, and
+refuses to write one that Instagram would truncate or that carries a link,
+since a caption cannot be clicked.
+
 Run: python3 notes_build.py notes/2026-w02.md [--out notes/2026-w02.html]
 """
 import argparse
@@ -30,7 +36,9 @@ import html
 import os
 import re
 
-KEYS = ("model", "line", "pick", "fact", "unknown", "read")
+KEYS = ("model", "line", "pick", "fact", "unknown", "read", "caption")
+CAPTION_MAX = 2200
+LINK = re.compile(r"https?://|www\.|\.com\b")
 
 PAGE = """<!DOCTYPE html>
 <html lang="en">
@@ -69,10 +77,13 @@ PAGE = """<!DOCTYPE html>
   footer {{ color:var(--dim); font-size:12.5px; border-top:1px solid var(--line);
     margin-top:24px; padding-top:14px; }}
   a {{ color:#58a6ff; }}
+  nav {{ max-width:680px; margin:0 auto 16px; font-size:13px; }}
+  nav a {{ margin-right:14px; }}
 </style>
 </head>
 <body>
 <header><h1>{title}</h1><div class="sub">{sub}</div></header>
+<nav><a href="/week">This week's numbers</a><a href="/">Pick sheet</a></nav>
 <main>
 {games}
 </main>
@@ -104,12 +115,39 @@ def parse(text):
             continue
         key, val = m.group(1).lower(), m.group(2).strip()
         target = cur if cur is not None else head
-        if key in ("fact", "unknown", "read"):
+        if cur is None and key in ("lead", "tail"):
+            # Repeatable: a caption reads as paragraphs, and one physical line
+            # per paragraph keeps the source diffable.
+            head.setdefault(key, []).append(val)
+        elif key in ("fact", "unknown", "read"):
             target["notes"].append((key, val)) if cur is not None \
                 else head.setdefault(key, val)
         elif key in KEYS or cur is None:
             target[key] = val
     return head, games
+
+
+def caption(text):
+    """The week in one post: the header's lead, a line per flagged game, the tail.
+
+    Instagram captions cannot be clicked, so a link here is dead text that
+    still costs characters -- the page is reached through the profile link and
+    the caption only has to say that.
+    """
+    head, games = parse(text)
+    lines = list(head.get("lead", []))
+    lines += [f"{g['match']} — {g['caption']}"
+              for g in games if g.get("caption")]
+    lines += head.get("tail", [])
+    out = "\n\n".join(lines) + "\n"
+    if len(out) > CAPTION_MAX:
+        raise ValueError(f"caption is {len(out)} characters, Instagram cuts "
+                         f"at {CAPTION_MAX}")
+    bad = LINK.search(out)
+    if bad:
+        raise ValueError(f"caption contains {bad.group(0)!r}: a caption link "
+                         "is not clickable, point at the profile link instead")
+    return out
 
 
 def render(text):
@@ -139,14 +177,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("source", help="the week's notes markdown")
     ap.add_argument("--out", help="defaults to the source with .html")
+    ap.add_argument("--caption", action="store_true",
+                    help="also write the Instagram caption as .txt")
     a = ap.parse_args()
 
     with open(a.source) as fh:
         text = fh.read()
-    out = a.out or os.path.splitext(a.source)[0] + ".html"
+    stem = os.path.splitext(a.source)[0]
+    out = a.out or stem + ".html"
     page = render(text)
     with open(out, "w") as fh:
         fh.write(page)
+    if a.caption:
+        body = caption(text)
+        with open(stem + ".txt", "w") as fh:
+            fh.write(body)
+        print(f"wrote {stem}.txt: {len(body)} of {CAPTION_MAX} characters")
     _, games = parse(text)
     facts = sum(1 for g in games for k, _ in g["notes"] if k == "fact")
     unknowns = sum(1 for g in games for k, _ in g["notes"] if k == "unknown")

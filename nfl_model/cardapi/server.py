@@ -40,6 +40,10 @@ KICKOFFS = os.environ.get("KICKOFFS", os.path.join(ROOT, "kickoffs.json"))
 # The published week page, uploaded by weekly_post.py. Served rather than
 # generated: fitting the model needs ~520 MB and the box has 458 MB.
 WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
+# The week's hand-written scouting notes, rendered by notes_build.py. Served
+# beside the sheet rather than merged into it: the sheet is what the model
+# says, and these are the things it cannot read.
+NOTES = os.environ.get("NOTESPAGE", os.path.join(ROOT, "notes.html"))
 PORT = int(os.environ.get("PORT", "80"))
 MAX_BODY = 64 * 1024
 MAX_PICKS = 20
@@ -251,6 +255,18 @@ class Handler(BaseHTTPRequestHandler):
             if not os.path.exists(WEEK):
                 return self._send(404, {"error": "no week page published"})
             with open(WEEK, "rb") as fh:
+                return self._send(200, fh.read(), "text/html; charset=utf-8")
+        if url.path in ("/notes", "/notes.html"):
+            if not os.path.exists(NOTES):
+                # Linked from the week page, so a reader can land here before
+                # the week's notes are written: say so in a page rather than
+                # answering a person with JSON.
+                return self._send(404, page(
+                    "No notes yet this week",
+                    "<p>This week's notes are not written yet. The numbers "
+                    "are already up.</p><p><a href='/week'>This week's "
+                    "numbers</a></p>"), "text/html; charset=utf-8")
+            with open(NOTES, "rb") as fh:
                 return self._send(200, fh.read(), "text/html; charset=utf-8")
         if url.path == "/health":
             live = [r for r in subscriber_state().values()
