@@ -38,7 +38,8 @@ import re
 
 KEYS = ("model", "line", "pick", "fact", "unknown", "read", "caption")
 CAPTION_MAX = 2200
-LINK = re.compile(r"https?://|www\.|\.com\b")
+# Case-insensitive: a shouted URL is the same dead text as a quiet one.
+LINK = re.compile(r"https?://|www\.|\.(?:com|net|org|io|co)\b", re.I)
 
 PAGE = """<!DOCTYPE html>
 <html lang="en">
@@ -185,11 +186,18 @@ def main():
         text = fh.read()
     stem = os.path.splitext(a.source)[0]
     out = a.out or stem + ".html"
+    # Both outputs are built before either is written, so a caption the guards
+    # refuse does not leave a half-published week on disk.
     page = render(text)
+    body = None
+    if a.caption:
+        try:
+            body = caption(text)
+        except ValueError as e:
+            raise SystemExit(f"caption: {e}")
     with open(out, "w") as fh:
         fh.write(page)
-    if a.caption:
-        body = caption(text)
+    if body is not None:
         with open(stem + ".txt", "w") as fh:
             fh.write(body)
         print(f"wrote {stem}.txt: {len(body)} of {CAPTION_MAX} characters")
