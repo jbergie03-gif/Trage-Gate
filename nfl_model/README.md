@@ -519,6 +519,146 @@ from the top of the week page. Missing notes answer with a page pointing back
 at the numbers rather than with a 404 body, since a reader can arrive from that
 link before the week's notes exist.
 
+## 12. Offensive line: rating one lineman fails, counting absent starters works
+
+The model docks a team the same amount for any missing non-quarterback, so a
+left tackle and a fourth safety cost the same. The obvious repair is to rate
+each lineman and adjust for him being in or out. Three scripts test whether
+that rating can be built from public data, in the order the question has to be
+asked.
+
+```bash
+python3 ol_study.py                       # unit level: continuity, position changes
+python3 ol_player_study.py --shuffles 20  # player level: on/off vs a shuffled floor
+python3 ol_player_check.py                # does the rating replicate?
+python3 ol_player_check.py --player Kelce # one lineman's game log
+python3 ol_missing.py --source injury     # what an absent starter costs
+```
+
+**What the free feed contains.** nflverse snap counts give per-game snap share
+and a position for every lineman, but only as `T`, `G`, `C` — a left tackle
+sliding to right tackle is invisible, and only about 1.5% of player-seasons
+change even at that coarse level. Depth charts carry true `LT/LG/C/RG/RT` but
+only from 2024. Play-by-play tags each run with a location and gap (end +0.096
+EPA, guard −0.033, tackle −0.026 in 2024), which supports team-level scheme
+work but does not say which lineman blocked whom.
+
+**Unit level** (`ol_study.py`, 5,328 team-games). A settled five is worth about
++0.066 EPA per dropback over the most shuffled ones, roughly two points a game
+— smaller than it feels. A lineman playing a different T/G/C spot shows **no
+penalty at all**: sack rate 0.0660 moved against 0.0668 in place, and pass EPA
+slightly better. The coarse position label is a plausible reason the effect
+hides, so this is not proof the penalty is absent, only that it cannot be seen.
+
+**Player level** (`ol_player_study.py`, 46,114 player-games, 499 linemen with
+at least 8 starts and 4 misses). Each lineman is rated on his own team's
+blocking with him in versus out, inside the same season and team, shrunk toward
+zero by sample size. Reshuffling who started which games 20 times builds a
+noise floor:
+
+| | spread of ratings | shuffled | signal left |
+|---|---|---|---|
+| sack rate | 0.0073 | 0.0067 | 0.0029 |
+| pass EPA | 0.0482 | 0.0427 | 0.0224 |
+| rush EPA | 0.0294 | 0.0293 | 0.0021 |
+
+Two clear the floor, and the surviving pass-EPA signal is 0.78 EPA over 35
+dropbacks — under a point of margin for a one-sigma lineman. That is the
+ceiling, and it is small.
+
+**The rating does not replicate** (`ol_player_check.py`). Rating every lineman
+twice on two random halves of his own games:
+
+```
+sack_rate  r = +0.014      pass_epa  r = -0.137      rush_epa  r = -0.189
+```
+
+Zero, and negative where it isn't. Season to season the carryover is the same
+story: `+0.036`, `+0.089`, `+0.020`. Split the started games but leave the
+missed games whole and correlation jumps to ~0.52 — both halves are then
+subtracting the identical baseline, so that agreement is arithmetic, not skill,
+and it is the trap this kind of table falls into.
+
+The named list reads the same way: Jason Kelce and David DeCastro rate near the
+top, which is right, while Dion Dawkins and Orlando Brown Jr. rate near the
+bottom, which is not. **No lineman rating from this data enters the model.**
+
+### But a missing starter does cost points — the market just knows
+
+Rating one lineman fails. Counting how much of the usual five is absent does
+not, and that is the question Jonathan actually asked. `ol_missing.py` marks a
+lineman a starter walk-forward (at least half the snaps in 60% of his team's
+last six games), then weights each absence by his own usual snap share, so a
+never-leaves-the-field tackle costs a full unit and a rotational guard costs a
+fraction. No opinion about who is good is required.
+
+The catch is what "missing" means, and it changes the answer completely:
+
+| `--source` | what it counts | margin | beyond the closing line |
+|---|---|---:|---:|
+| `snaps` | under half the snaps | +1.64 ± 0.30 | **+0.74 ± 0.27** |
+| `inactive` | never dressed | +1.80 ± 0.36 | +0.56 ± 0.32 |
+| `injury` | listed Out/Doubtful | +0.51 ± 0.55 | −0.03 ± 0.49 |
+
+Points of home margin per one missing full-time starter on the away line, over
+2,169 games. The first row looks like a market-beating edge and is not one: a
+team being blown out pulls its starters, so "played under half the snaps"
+is partly an effect of the result, and the regression reads it backwards. The
+clean measures keep the football effect — a line missing a full-time starter
+really is worth roughly 1.5 to 2 points — and lose the edge. Against the
+closing line the only version the model could actually use on Friday scores
+−0.03 ± 0.49: **the market prices missing linemen correctly.**
+
+Blocking moves the way it should under the same measure: pass EPA −0.018 per
+missing starter (t = −2.7) with three or more out costing −0.10, while sack
+rate barely moves. One more caveat on the injury report row — it catches under
+half of the absences the snap counts show (0.19 per game against 0.44), because
+linemen are scratched without ever being designated Out.
+
+### Play by play is better and still not enough
+
+The game-level rating saw sixteen observations a year per lineman. nflverse
+[participation data](https://nflreadr.nflverse.com/reference/load_participation.html)
+lists every player on the field for every play back to 2016, free under
+CC-BY-SA, which is about a thousand. `ol_plusminus.py` uses it for a ridge
+plus-minus: one column per lineman, one per team-season offence, one per
+defence, so a man is measured against his own team's baseline and the five
+linemen on a play are separated only by the plays where the group changes.
+
+```bash
+python3 ol_plusminus.py                       # 201,662 pass plays, 2016-2025
+python3 ol_plusminus.py --kind run
+python3 ol_plusminus.py --y sack --ridge 200 --min-plays 1000
+```
+
+| outcome | signal over shuffled | split-half | carryover |
+|---|---:|---:|---:|
+| pass EPA | 0.042 | **+0.124** | +0.029 |
+| run EPA | 0.033 | +0.053 | +0.040 |
+| sacks | 0.007 | +0.118 | −0.035 |
+
+Split-half is now positive where the game-level version was negative, so 60x
+the data did buy something — but +0.12 means the two halves share under 2% of
+their variance, and carryover across seasons is still zero. It is stable under
+heavier shrinkage too (ridge 200 and 800 give +0.111 and +0.092).
+
+The ranking confirms it from the other end: Penei Sewell and Quenton Nelson,
+two of the best linemen in football, land in the bottom ten, while several
+rookies and journeymen top it. **No lineman rating enters the model, and this
+was the last free avenue.** Only charted per-play blocking data — SIS, PFF —
+could settle it.
+
+Paid alternatives were checked rather than assumed. ESPN's pass block win rate
+is real — tracking chips, a 2.5-second survival threshold — but is published as
+a weekly top-20 list inside articles, with no per-game history to backtest.
+Pancakes are not an NFL statistic and never have been; they are hand-charted by
+teams and schools. [Sports Info
+Solutions](https://www.sportsinfosolutions.com/football/) is the serious one:
+every play charted since 2015, per-lineman blown-block rate and blocking Total
+Points, downloadable as CSV, with the free tier capped at top-20 leaderboards
+and full access at $749.99/year. Worth revisiting only if an OL feature first
+shows value.
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
