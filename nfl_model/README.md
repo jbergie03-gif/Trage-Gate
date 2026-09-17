@@ -434,6 +434,39 @@ Unverified so far: whether any of it improves a model. The props file is a
 market snapshot, so its first use is measuring our own prop numbers against five
 books at once, not adding a feature.
 
+## 11. `notes_build.py` — the half of a game the model cannot hold
+
+The model reads about 35 numbers and no sentences. It cannot know that Atlanta's
+coach refused to name a quarterback, that Philadelphia's best interior lineman
+sat out Wednesday, or that the Rams lost a pass rusher for a month. Turning that
+into a feature would need a historical archive of the same text to test against,
+which does not exist — so instead it lives beside the number, in a file written
+by hand and labelled line by line:
+
+```
+## CAR @ ATL — Sun 10:00 AM PT
+model: ATL by 5.1
+line: CAR -2.5
+pick: ATL +2.5 — DOUBLE
+fact: Tua Tagovailoa did not practise Wednesday (oblique).
+unknown: Stefanski will not name a starter.
+read: The week's biggest edge rests on that unknown.
+```
+
+`fact` is published and checkable. `unknown` is written down so it cannot be
+quietly promoted to a fact later. `read` is opinion and is labelled opinion — a
+note with a `read` and no `fact` is the failure this format exists to prevent.
+
+```bash
+python3 notes_build.py notes/2026-w02.md   # -> notes/2026-w02.html
+```
+
+The renderer is a formatter, not a source of truth: it never touches the model,
+the sheet, or a pick, and a `read` that disagrees with the pick stays in the
+note rather than changing it. Week 2's notes carry 43 facts and 4 open
+questions, and on three games — PHI @ TEN, WAS @ DAL, CLE @ TB — the reporting
+argues against the model's own side. That is left visible on purpose.
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
