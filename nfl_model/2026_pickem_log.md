@@ -245,3 +245,143 @@ Scoring after the games: 1 point per correct side, 2 per double-weight game,
 pushes void, 15 points available each. Devin's model-only ATS card (ATL +6
 rather than the amended PIT -6) is scored separately so the model's own record
 stays honest.
+
+### Revision — 2026-09-13 08:31 PT (before the 13:25 PT kickoff)
+
+Jonathan flipped one game and left the other twelve alone: **LV -3.0 → MIA
++3.0**, single weight. Filed as revision 3 through the card endpoint, so the
+original 16:14/16:20 PT cards remain in `cards.jsonl` and the change is dated
+ahead of kickoff.
+
+Reason on the record: he saw 3.5 on ESPN; DK, FanDuel and BetMGM all read LV
+-3.0 at 08:30 PT, so the half point was a book difference rather than a move.
+The model has Miami by 0.5 — a coin flip by its own standard, called out as
+such at the time. The flip was his call, not a new model result.
+
+Effect on the head-to-head: agreement rises to 6 of 13. Devin holds MIA +3.0 at
+double weight, so the game now pays Devin 2 and Jonathan 1 if Miami covers, and
+costs Devin 2 to Jonathan's 1 if it doesn't. Two lines moved since the cards
+were filed (MIN -2.5 → -1.5, PIT -6.0 → -6.5); both cards keep the number that
+was on the board when they were submitted.
+
+## Week 1 results — scored 2026-09-13 20:05 PT (12 of 13 final)
+
+Final scores from the ESPN scoreboard feed for 2026-09-13. DAL @ NYG was still
+playing (DAL 14, NYG 28, 7:06 left in the 4th) and is scored as pending.
+
+| Game | Final | Jonathan | Devin | J | D |
+|---|---|---|---|:--:|:--:|
+| ATL @ PIT | PIT 20-13 | PIT -6.0 | PIT -6.0 | W 1 | W 1 |
+| BAL @ IND | BAL 41-23 | **BAL -3.5** | IND +3.5 | W 2 | L 0 |
+| BUF @ HOU | BUF 36-31 | HOU +1.5 | HOU +1.5 | L 0 | L 0 |
+| CHI @ CAR | CHI 59-37 | CHI -3.0 | CAR +3.0 | W 1 | L 0 |
+| TB @ CIN | CIN 33-27 | CIN -3.5 | TB +3.5 | W 1 | L 0 |
+| CLE @ JAX | JAX 34-10 | **JAX -8.5** | **CLE +8.5** | W 2 | L 0 |
+| NO @ DET | DET 31-30 OT | DET -7.0 | DET -7.0 | L 0 | L 0 |
+| NYJ @ TEN | NYJ 23-10 | TEN -1.5 | TEN -1.5 | L 0 | L 0 |
+| ARI @ LAC | ARI 26-14 | LAC -9.5 | **ARI +9.5** | L 0 | W 2 |
+| GB @ MIN | MIN 39-22 | MIN -2.5 | GB +2.5 | W 1 | L 0 |
+| MIA @ LV | LV 27-13 | MIA +3.0 | **MIA +3.0** | L 0 | L 0 |
+| WAS @ PHI | PHI 24-22 | PHI -6.0 | PHI -6.0 | L 0 | L 0 |
+| DAL @ NYG | pending | DAL -3.0 | NYG +3.0 | — | — |
+
+**Jonathan 6-6, 8 points. Devin 2-10, 3 points.** Jonathan's all-favorites card
+beat the model's dog-heavy card by 5 points with one game left.
+
+Notes for the record:
+
+- The MIA flip cost Jonathan a point. LV -3.0 as originally filed would have
+  won; the revision to MIA +3.0 lost. Devin recommended the Miami side while
+  labelling it a coin flip (model had MIA by 0.5), and the recommendation was
+  wrong.
+- Favorites went 9-3 straight up and covered 6 of 12. The model's method
+  systematically preferred dogs, which is exactly the bet that lost.
+- Straight-up the model was **8-4** (missed TEN, LAC, GB/MIN, MIA/LV). The card
+  lost on spreads, not on picking winners.
+- Weekly margin error: model **11.3**, closing line **10.6**. Same ordering as
+  the 1,962-game backtest (10.23 vs 9.82), one week is not evidence either way.
+- Two lines moved after the cards were filed (MIN -2.5 -> -1.5, PIT -6.0 ->
+  -6.5). Neither change would have altered any result above.
+
+## Week 1 closed — 2026-09-16 15:30 PT
+
+DAL @ NYG finished **NYG 28-20**. Jonathan had DAL -3.0 (loss), Devin had
+NYG +3.0 (win, single).
+
+**Final Week 1: Jonathan 6-7, 8 points. Devin 3-10, 4 points.**
+
+Separate from the 13-game head-to-head card: the Monday sheet published after
+the Sunday games had the model on **DEN +2.5 as a double** for DEN @ KC. KC won
+31-10, so that pick lost 2 points. It is recorded here because it was published
+before the 5:15 PM PT kickoff, not scored into the 13-game total above, which
+Jonathan and Devin both filed on the same slate. NE @ SEA and SF @ LA (Week 1
+prime time) were never on the sheet and are unpicked for both sides.
+
+## Week 2 model card — filed 2026-09-16 15:30 PT
+
+Model refit on data through Week 1. Lines are the DraftKings snapshot taken
+2026-09-16 15:26 PT; the sheet shows the snapshot time. Doubles are the two
+largest disagreements with the market, the same rule as every week.
+
+| Kickoff PT | Game | Line (DK) | Model pick | Model edge |
+|---|---|---|---|---|
+| Thu 5:15 PM | DET @ BUF | BUF -4.5 | BUF -4.5 | 0.0 — coin flip |
+| Sun 10:00 AM | CAR @ ATL | CAR -2.5 | **ATL +2.5 (DOUBLE)** | 7.6 |
+| Sun 10:00 AM | NO @ BAL | BAL -7.5 | NO +7.5 | 1.9 |
+| Sun 10:00 AM | MIN @ CHI | CHI -4.5 | MIN +4.5 | 3.5 |
+| Sun 10:00 AM | CIN @ HOU | HOU -3.0 | HOU -3.0 | 1.5 |
+| Sun 10:00 AM | PIT @ NE | NE -5.5 | NE -5.5 | 2.7 |
+| Sun 10:00 AM | GB @ NYJ | GB -3.5 | GB -3.5 | 4.4 |
+| Sun 10:00 AM | CLE @ TB | TB -8.5 | CLE +8.5 | 3.1 |
+| Sun 10:00 AM | PHI @ TEN | PHI -7.0 | TEN +7.0 | 0.1 — coin flip |
+| Sun 1:05 PM | JAX @ DEN | DEN -2.5 | **JAX +2.5 (DOUBLE)** | 4.5 |
+| Sun 1:05 PM | LV @ LAC | LAC -6.5 | LV +6.5 | 1.1 |
+| Sun 1:25 PM | SEA @ ARI | SEA -3.5 | SEA -3.5 | 2.0 |
+| Sun 1:25 PM | WAS @ DAL | DAL -4.5 | WAS +4.5 | 2.1 |
+| Sun 1:25 PM | MIA @ SF | SF -13.5 | MIA +13.5 | 2.8 |
+| Sun 5:20 PM | IND @ KC | KC -6.5 | IND +6.5 | 1.0 |
+| Mon 5:15 PM | NYG @ LA | LA -7.0 | NYG +7.0 | 0.2 — coin flip |
+
+Injury check as of 2026-09-16: the Week 2 report has only 11 entries so far and
+**no QB is listed**, so no starting-quarterback change is priced into any pick
+above. Designations (Out/Doubtful/Questionable) post Friday. The only DNPs are
+BUF DE T.J. Sanders and DET's Christian Mahogany (G) and Blake Miller (T) — two
+Detroit offensive-line bodies ahead of the Thursday game, which is a small
+negative for DET that the model does not include.
+
+Standing caveat: the model's measured margin error is 10.23 vs the closing
+line's 9.82 over 1,962 games and it does not beat the market ATS. These picks
+are a record, not an edge claim.
+
+### Week 2 addendum — 2026-09-16 16:20 PT: the ATL quarterback is unresolved
+
+The model's largest edge of the week (ATL +2.5, a double) is built on a
+schedule file that lists **Tua Tagovailoa** as Atlanta's Week 2 starter. That is
+the feed's projection, not a confirmed start. Verified today: Tua did not
+practice Wednesday (oblique, same injury that kept him out of Week 1), Cooper
+Rush is being treated for back spasms, Michael Penix Jr. practiced away from
+the team, and Kevin Stefanski declined to name a starter.
+
+Refit with Cooper Rush in the slot instead of Tua: ATL by **3.24** rather than
+5.07, so the edge falls from **+7.6 to +5.7**. Still the largest disagreement on
+the board, so the double does not move, but the number is softer than the sheet
+shows and the market's willingness to favour Carolina on the road is probably
+this injury.
+
+### Week 2 addendum — 2026-09-16 16:45 PT: the check caught a second one, MIN
+
+`input_check.py` now runs with every sheet build. On Week 2 it flagged the
+Atlanta problem above and one I had missed:
+
+**MIN @ CHI.** The schedule lists **Kyler Murray** as Minnesota's starter. Fact,
+verified 2026-09-16: Murray has been in the concussion protocol since an illegal
+hit in the opener; Carson Wentz started that game after he left and went 12/19,
+133 yards, 3 TD. ESPN's Dan Graziano reports Minnesota starts Murray if he
+clears protocol in time and Wentz if he does not; Kevin O'Connell has said only
+"a day at a time." Unknown, therefore, who starts.
+
+Model with Murray: CHI by 1.0, so MIN +4.5 is a 3.5-point edge.
+Model with Wentz: CHI by 2.0, so the edge falls to **2.5**.
+
+Neither published pick changes — MIN +4.5 and ATL +2.5 stay as filed, and the
+two doubles stay on ATL and JAX. Both numbers are softer than the sheet shows.
