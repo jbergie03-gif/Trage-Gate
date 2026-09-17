@@ -615,12 +615,38 @@ rate barely moves. One more caveat on the injury report row — it catches under
 half of the absences the snap counts show (0.19 per game against 0.44), because
 linemen are scratched without ever being designated Out.
 
-Not yet tried, and the best free lead: nflverse
+### Play by play is better and still not enough
+
+The game-level rating saw sixteen observations a year per lineman. nflverse
 [participation data](https://nflreadr.nflverse.com/reference/load_participation.html)
 lists every player on the field for every play back to 2016, free under
-CC-BY-SA. That allows a play-level plus-minus instead of a game-level one, which
-is a genuinely stronger estimator. It ships after the postseason, so it can
-build ratings from past years but cannot see the current week.
+CC-BY-SA, which is about a thousand. `ol_plusminus.py` uses it for a ridge
+plus-minus: one column per lineman, one per team-season offence, one per
+defence, so a man is measured against his own team's baseline and the five
+linemen on a play are separated only by the plays where the group changes.
+
+```bash
+python3 ol_plusminus.py                       # 201,662 pass plays, 2016-2025
+python3 ol_plusminus.py --kind run
+python3 ol_plusminus.py --y sack --ridge 200 --min-plays 1000
+```
+
+| outcome | signal over shuffled | split-half | carryover |
+|---|---:|---:|---:|
+| pass EPA | 0.042 | **+0.124** | +0.029 |
+| run EPA | 0.033 | +0.053 | +0.040 |
+| sacks | 0.007 | +0.118 | −0.035 |
+
+Split-half is now positive where the game-level version was negative, so 60x
+the data did buy something — but +0.12 means the two halves share under 2% of
+their variance, and carryover across seasons is still zero. It is stable under
+heavier shrinkage too (ridge 200 and 800 give +0.111 and +0.092).
+
+The ranking confirms it from the other end: Penei Sewell and Quenton Nelson,
+two of the best linemen in football, land in the bottom ten, while several
+rookies and journeymen top it. **No lineman rating enters the model, and this
+was the last free avenue.** Only charted per-play blocking data — SIS, PFF —
+could settle it.
 
 Paid alternatives were checked rather than assumed. ESPN's pass block win rate
 is real — tracking chips, a 2.5-second survival threshold — but is published as
