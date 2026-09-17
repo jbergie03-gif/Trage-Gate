@@ -496,14 +496,28 @@ quietly promoted to a fact later. `read` is opinion and is labelled opinion — 
 note with a `read` and no `fact` is the failure this format exists to prevent.
 
 ```bash
-python3 notes_build.py notes/2026-w02.md   # -> notes/2026-w02.html
+python3 notes_build.py notes/2026-w02.md --caption
+# -> notes/2026-w02.html  (served at /notes)
+# -> notes/2026-w02.txt   (the Instagram caption)
 ```
+
+A game may also carry a `caption:` line — the same game in one sentence — and
+`--caption` collects those between the header's `lead` and `tail` into the
+post's text. It refuses to write a caption over 2,200 characters (Instagram
+truncates) or one containing a link, because a caption cannot be clicked: the
+page is reached through the profile link, so the caption only has to say so.
+Week 2's caption is 1,524 characters across four games.
 
 The renderer is a formatter, not a source of truth: it never touches the model,
 the sheet, or a pick, and a `read` that disagrees with the pick stays in the
 note rather than changing it. Week 2's notes carry 43 facts and 4 open
 questions, and on three games — PHI @ TEN, WAS @ DAL, CLE @ TB — the reporting
 argues against the model's own side. That is left visible on purpose.
+
+The rendered page is uploaded as `notes.html` and served at `/notes`, linked
+from the top of the week page. Missing notes answer with a page pointing back
+at the numbers rather than with a 404 body, since a reader can arrive from that
+link before the week's notes exist.
 
 ## Data sources
 
