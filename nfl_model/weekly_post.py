@@ -23,6 +23,7 @@ import pandas as pd
 
 import game_model
 import market_flow
+import smash_feature
 
 try:
     from PIL import Image
@@ -336,12 +337,20 @@ def render(season, week, rows, rec, now):
 
     o.append(SIGNUP)
 
+    smash = max((abs(r.get("smash") or 0) for r in rows), default=0)
     o.append("</main><footer><b>How to read this.</b> Both numbers are the "
              "expected home margin. Mine comes from a ridge model on "
              "opponent-adjusted efficiency, quarterback value, the injury "
              "report, rest and travel — fit only on games played before the "
              "one it is predicting.<br><br>"
-             "<b>Out of sample it does not beat the closing line:</b> 10.23 "
+             + ("<b>One input here is not fit, it is assumed.</b> Each game's "
+                "number is nudged up to 1.5 points by Fantasy Guru's "
+                "offensive-line matchup rating. Their pages keep no history, "
+                "so that size is a judgement call rather than something "
+                "measured, and both the nudged and unnudged numbers are "
+                "logged here every week so it can be scored later.<br><br>"
+                if smash > 0.01 else "")
+             + "<b>Out of sample it does not beat the closing line:</b> 10.23 "
              "points of average error against the market's 9.82 over 1,962 "
              "games, and 48.3% against the spread. That is published here for "
              "the same reason the numbers are: a record you can check is the "
@@ -396,7 +405,8 @@ def build(season=None, week=None, out=OUT, image=True):
         if season is None:
             print("no upcoming games with a posted line")
             return None
-    slate = game_model.predict_slate(df, season, week)
+    slate = smash_feature.apply(game_model.predict_slate(df, season, week))
+    smash_feature.log(slate, season, week)
     times = pd.read_csv(GAMES, usecols=["game_id", "gametime"])
     slate = slate.merge(times, on="game_id", how="left")
     notes = market_flow.slate_notes(season, week)
@@ -404,6 +414,7 @@ def build(season=None, week=None, out=OUT, image=True):
     rows = [dict(home=r.home_team, away=r.away_team, kick=kickoff(r._asdict()),
                  spread_line=r.spread_line, total_line=r.total_line,
                  pred_margin=r.pred_margin, pred_total=r.pred_total,
+                 smash=getattr(r, "smash_adj", 0.0),
                  note=notes.get((r.away_team, r.home_team)))
             for r in slate.itertuples()]
     rows.sort(key=lambda r: r["kick"])
