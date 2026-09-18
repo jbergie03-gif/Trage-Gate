@@ -403,7 +403,8 @@ class Handler(BaseHTTPRequestHandler):
                 "late": sorted(late),
             })
 
-        row = {"submitted_at_pt": datetime.datetime.now(PACIFIC).isoformat(timespec="seconds"), **card}
+        now = datetime.datetime.now(PACIFIC).isoformat(timespec="seconds")
+        row = {"submitted_at_pt": now, **card}
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(CARDS, "a") as fh:
             fh.write(json.dumps(row) + "\n")
