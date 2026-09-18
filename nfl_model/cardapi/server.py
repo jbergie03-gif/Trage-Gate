@@ -45,6 +45,9 @@ WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
 # says, and these are the things it cannot read.
 NOTES = os.environ.get("NOTESPAGE", os.path.join(ROOT, "notes.html"))
 PORT = int(os.environ.get("PORT", "80"))
+# Behind Caddy on the droplet, so it binds loopback there and the certificate
+# terminates in front of it. Default stays public for running it bare.
+HOST = os.environ.get("HOST", "0.0.0.0")
 MAX_BODY = 64 * 1024
 MAX_PICKS = 20
 # Deliberately loose: the only address format worth rejecting is one that
@@ -400,7 +403,8 @@ class Handler(BaseHTTPRequestHandler):
                 "late": sorted(late),
             })
 
-        row = {"submitted_at_pt": datetime.datetime.now(PACIFIC).isoformat(timespec="seconds"), **card}
+        now = datetime.datetime.now(PACIFIC).isoformat(timespec="seconds")
+        row = {"submitted_at_pt": now, **card}
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(CARDS, "a") as fh:
             fh.write(json.dumps(row) + "\n")
@@ -420,4 +424,4 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
     print(f"serving pick sheet + card API on :{PORT}, data in {DATA_DIR}", flush=True)
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

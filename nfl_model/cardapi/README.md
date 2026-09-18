@@ -13,8 +13,7 @@ Two properties are deliberate:
   asserted. Amending a pick on late injury news stays legitimate *and* visible.
 - **Same origin.** The sheet is served by this process rather than from a
   separate static host, because a page loaded over HTTPS cannot POST to an HTTP
-  endpoint. Serving both together removes the copy/paste step without needing a
-  certificate for a bare IP.
+  endpoint. Serving both together removes the copy/paste step.
 
 ## Endpoints
 
@@ -63,7 +62,8 @@ PORT=8899 CARD_DATA_DIR=/tmp/cards PICKSHEET=../picksheet/index.html python3 ser
 
 ## Deploy
 
-Runs on the same droplet as `nfl_scanner`, on port 80:
+Runs on the same droplet as `nfl_scanner`, live at
+**https://gridironmath.com**:
 
 ```bash
 scp server.py ../picksheet/index.html root@<host>:/opt/nfl-cards/
@@ -71,10 +71,18 @@ scp nfl-cards.service root@<host>:/etc/systemd/system/
 ssh root@<host> 'systemctl daemon-reload && systemctl enable --now nfl-cards'
 ```
 
-Plain HTTP on a bare IP. That was fine when the box held only spreads and
-pick'em selections; it now takes email addresses, which means **signups travel
-unencrypted**. A domain with TLS should land before the page is advertised
-anywhere. No credentials are stored either way.
+The service binds `127.0.0.1:8080` and Caddy holds 80/443 in front of it with
+a Let's Encrypt certificate it renews itself, so nothing here has a certbot
+timer to forget. `Caddyfile` goes to `/etc/caddy/Caddyfile`:
+
+```bash
+scp Caddyfile root@<host>:/etc/caddy/ && ssh root@<host> 'systemctl reload caddy'
+```
+
+The page takes email addresses, so the certificate is the point: on the old
+bare IP a signup crossed the network in clear text and no certificate was
+possible. `http://138.197.14.49` now redirects to the name rather than serving,
+because the caption, the profile link and three filed cards all pointed at it.
 
 ## Publishing the week page
 
