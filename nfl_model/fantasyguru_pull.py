@@ -6,7 +6,7 @@ feed the CSV/Excel downloads to a model with one condition: rate limit it.
 before lock" is fine; constant traffic gets the IP banned. So every run checks a
 stamp file first and refuses to hit the site again inside the interval.
 
-    python3 fantasyguru_pull.py                       # once a day, both sets
+    python3 fantasyguru_pull.py                       # once a day, all sets
     python3 fantasyguru_pull.py --dataset props       # props only
     python3 fantasyguru_pull.py --min-interval 600    # Sunday morning cadence
     python3 fantasyguru_pull.py --force               # I know what I am doing
@@ -14,15 +14,20 @@ stamp file first and refuses to hit the site again inside the interval.
 Credentials come from FANTASYGURU_USER / FANTASYGURU_PASS. Downloads land
 outside the repo (default ~/fgdata) because it is a paid feed, not our data.
 
-Two sets are worth taking:
+Three sets are worth taking:
 
   props     /nfl-player-props — every prop market priced at five books plus a
             consensus, which is the one thing nflverse cannot give us.
   rankings  /jeff-mans-nfl-weekly-rankings-ppr — the CSV export button, per
             position. Fantasy ranks, not a betting number.
+  smash     /data/nfl/nfl-smash-report-* — proprietary line and coverage
+            ratings. Each page overwrites itself weekly and keeps no archive,
+            so a dated snapshot now is the only way the numbers ever become
+            testable. Nothing here goes near the model until enough weeks are
+            stored to check it out of sample.
 
-The stat pages under /data/nfl are Sportradar widgets with no export, so there
-is nothing to pull there.
+The other stat pages under /data/nfl are Sportradar widgets with no export, so
+there is nothing to pull there.
 """
 import argparse
 import csv
@@ -47,6 +52,13 @@ MARKETS = [
     "Long Rec", "Long Rush", "Tackles",
 ]
 POSITIONS = ["QB", "RB", "WR", "TE", "K", "DST"]
+
+# Each SMASH page renders one table with the same CSV button over it.
+SMASH = [
+    "nfl-smash-report-ratings",       # per team: offensive line, defensive front
+    "nfl-smash-report-matchups",      # per game: both lines and the advantage
+    "nfl-smash-report-wr-coverage",   # per matchup: coverage type, advantage
+]
 
 TABLE_JS = """() => {
   const t = document.querySelector('table');
@@ -149,11 +161,37 @@ def rankings(page, day):
     return made
 
 
+def smash(page, day):
+    """The three NFL SMASH tables, each through its own CSV button."""
+    root = os.path.join(OUT, "smash", day)
+    os.makedirs(root, exist_ok=True)
+    made = []
+    for slug in SMASH:
+        page.goto(f"{HOME}/data/nfl/{slug}", wait_until="domcontentloaded")
+        page.wait_for_selector("table tbody tr", timeout=60000)
+        button = (page.query_selector("button:text-is('CSV')")
+                  or page.query_selector("a:text-is('CSV')"))
+        path = os.path.join(
+            root, slug.replace("nfl-smash-report-", "") + ".csv")
+        if button:
+            with page.expect_download(timeout=60000) as dl:
+                button.click()
+            dl.value.save_as(path)
+            with open(path) as fh:
+                made.append(f"{path} ({sum(1 for _ in fh) - 1} rows)")
+        else:
+            # The button is theirs to remove; the table is the data.
+            rows = page.evaluate(TABLE_JS)
+            if rows:
+                made.append(write(rows, path))
+    return made
+
+
 def main():
     global OUT
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dataset", default="props,rankings",
-                    help="props, rankings, or both")
+    ap.add_argument("--dataset", default="props,rankings,smash",
+                    help="props, rankings, smash, or a comma-separated mix")
     ap.add_argument("--min-interval", type=int, default=DAY,
                     help="seconds between pulls of the same set (default 1 day)")
     ap.add_argument("--force", action="store_true",
@@ -177,10 +215,11 @@ def main():
         return
 
     day = datetime.datetime.now(PACIFIC).strftime("%Y-%m-%d")
-    jobs = {"props": props, "rankings": rankings}
+    jobs = {"props": props, "rankings": rankings, "smash": smash}
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
-            os.path.join(OUT, "browser"), headless=True)
+            os.path.join(OUT, "browser"), headless=True,
+            accept_downloads=True)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         login(page)
         for dataset in todo:
