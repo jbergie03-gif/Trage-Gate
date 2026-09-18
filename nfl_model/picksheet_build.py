@@ -25,6 +25,7 @@ import pandas as pd
 
 import game_model
 import input_check
+import smash_feature
 import weekly_post
 
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -99,7 +100,8 @@ def week_lines(df, season, week, lines):
 def rows(df, season, week, stars=STARS, now=None):
     lines, stamp = dk_lines()
     df = week_lines(df, season, week, lines)
-    slate = game_model.predict_slate(df, season, week)
+    slate = smash_feature.apply(game_model.predict_slate(df, season, week))
+    smash_feature.log(slate, season, week)
     pred = {r.game_id: r.pred_margin for r in slate.itertuples()}
     now = now or datetime.datetime.now(PACIFIC)
 

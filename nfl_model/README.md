@@ -463,13 +463,41 @@ game level the O-line advantage correlates +0.51 with the closing spread across
 the 14 week-2 games that join to a line, so most of what it says is already in
 the price.
 
-So the puller stores a dated copy every run and nothing else happens. A snapshot
-per week is the only way the rating ever becomes testable, and a feature earns a
-coefficient here only after it is checked out of sample.
+The puller stores a dated copy every run, which is the only way the rating ever
+becomes testable.
 
 Unverified so far: whether any of this improves a model. The props file is a
 market snapshot, so its first use is measuring our own prop numbers against five
 books at once, not adding a feature.
+
+### `smash_feature.py` — the rating in the published number
+
+Jonathan asked for it in the sheet anyway, told what it is. Every other feature
+here earned its coefficient by being fit on completed games; this one could not,
+because on the day it was written one snapshot existed. So the size is a prior:
+
+```
+adjustment = clip(0.5 * z(their home O-line advantage − away), ±1.5) points
+```
+
+Standardised inside the slate, because a raw 40 on an undocumented scale means
+nothing while *widest line mismatch of the week* is a statement worth sizing.
+Half a point per standard deviation sits below the 1.6 points the missing-starter
+work measured for losing a full-time lineman, and well below it deliberately, since
++0.51 of this already lives in the spread. On week 2 it moved all 16 games and
+changed the side of the line on two, both of them sub-point coin flips.
+
+```bash
+python3 smash_feature.py                      # what it would move, per game
+python3 smash_feature.py --points-per-sd 0    # off, same code path
+python3 smash_feature.py --score              # plain vs nudged, once played
+```
+
+Both numbers go to `data/smash_log.csv` on every build — the plain model and the
+nudged one, with the snapshot date they came from. Around week 13 there are
+enough weeks on disk for `--score` to say which was better, at which point this
+either earns a fitted coefficient or `SMASH_POINTS_PER_SD=0` retires it. The
+week page says in its footer that one input is assumed rather than fit.
 
 ## 10. `input_check.py` — fact-check the inputs before publishing
 
