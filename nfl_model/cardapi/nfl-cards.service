@@ -6,7 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/nfl-cards
-Environment=PORT=80
+Environment=PORT=8080
+Environment=HOST=127.0.0.1
 Environment=CARD_DATA_DIR=/opt/nfl-cards/data
 Environment=PICKSHEET=/opt/nfl-cards/index.html
 ExecStart=/usr/bin/python3 /opt/nfl-cards/server.py

@@ -1,0 +1,18 @@
+# HTTPS for the pick sheet. Caddy fetches and renews the certificate itself,
+# so there is no certbot timer to forget about.
+#
+# The signup box posts an email address, and on a bare IP that address crosses
+# the network in clear text with no certificate possible -- a name is what
+# makes the form encryptable at all.
+gridironmath.com, www.gridironmath.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+# The old address, kept working on plain HTTP: the caption, the profile link
+# and three filed cards all pointed at it, and a dead link is worse than an
+# unencrypted one. Redirects rather than serves, so the name is what gets
+# indexed and what the signup form is submitted from.
+http://138.197.14.49 {
+	redir https://gridironmath.com{uri} permanent
+}

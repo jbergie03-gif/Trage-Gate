@@ -38,8 +38,11 @@ import re
 
 KEYS = ("model", "line", "pick", "fact", "unknown", "read", "caption")
 CAPTION_MAX = 2200
-# Case-insensitive: a shouted URL is the same dead text as a quiet one.
-LINK = re.compile(r"https?://|www\.|\.(?:com|net|org|io|co)\b", re.I)
+# Case-insensitive: a shouted URL is the same dead text as a quiet one. The
+# dotted quad is here because the site spent its first weeks on a bare IP,
+# which reads as a number rather than a link and slipped the other patterns.
+LINK = re.compile(r"https?://|www\.|\.(?:com|net|org|io|co)\b"
+                  r"|\b\d{1,3}(?:\.\d{1,3}){3}\b", re.I)
 
 PAGE = """<!DOCTYPE html>
 <html lang="en">
