@@ -27,4 +27,12 @@ for year in $(seq 2016 2026); do
 done
 wait
 
+# who was on the field for each play: 2016-2022 from NGS, 2023 on from FTN,
+# published only after the postseason, so the current year is absent
+for year in $(seq 2016 2025); do
+  curl -fsSL -o "$DIR/part_$year.parquet" \
+    "$BASE/pbp_participation/pbp_participation_$year.parquet" &
+done
+wait
+
 du -sh "$DIR"
