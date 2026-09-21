@@ -409,7 +409,7 @@ left and exits without touching the site.
 
 ```bash
 export FANTASYGURU_USER=... FANTASYGURU_PASS=...   # never committed
-python3 fantasyguru_pull.py                        # once a day, both sets
+python3 fantasyguru_pull.py                        # once a day, all sets
 python3 fantasyguru_pull.py --dataset props --min-interval 600   # near lock
 python3 fantasyguru_pull.py --force                # deliberate override
 ```
@@ -424,15 +424,80 @@ What is actually available, having walked all 88 subscriber pages:
 |---|---|---|---|
 | `props` | `/nfl-player-props` | ~1,150 across 13 markets | **The reason to do this.** Every prop priced at FanDuel, BetMGM, Caesars, Fanatics and a consensus — a cross-book comparison nflverse cannot produce |
 | `rankings` | `/jeff-mans-nfl-weekly-rankings-ppr` | ~220 across 6 positions | Thin: rank, player, team, bye, opponent. No projection column |
+| `smash` | `/data/nfl/nfl-smash-report-{ratings,matchups,wr-coverage}` | 32 teams, 16 games, 24 coverage matchups | Their own line ratings, with a working CSV button. Unusable today for the reason below, and worth snapshotting anyway |
 
-The stat pages under `/data/nfl` — team stats, player stats, injuries, SMASH
-reports — are Sportradar widgets with no export button and no underlying JSON of
-our own to read, so there is nothing to pull there. That rules out the thing that
-would have helped the game model most; what we got instead is a props feed.
+Correcting an earlier claim in this file: the SMASH pages are **not** a
+Sportradar widget and they do have an export. Team stats, player stats and
+injuries under `/data/nfl` are the widget, and those still cannot be pulled.
 
-Unverified so far: whether any of it improves a model. The props file is a
+### What the SMASH reports contain
+
+| Report | Columns |
+|---|---|
+| Ratings | team, offensive line, defensive front |
+| Matchups | away, home, each side's O-line and D-line, and each side's O-line advantage |
+| WR coverage | defensive back, team, coverage type and rate, advantage, the receiver he draws |
+
+The scale is proprietary and undocumented for football; Fantasy Guru's only
+write-up of SMASH is the baseball one, which describes it as a mix of underlying
+skill measures against league average and tells the reader not to read much into
+small gaps.
+
+### Why it cannot be used yet, and what it is measured against
+
+Each page overwrites itself weekly and keeps no archive, so there is no history
+to backtest — the same wall as ESPN's block win rate. Against a single snapshot
+(2026-09-18) the O-line rating behaves like a season-to-date results number
+rather than an independent grade of a line:
+
+| SMASH offensive line vs | r |
+|---|---:|
+| the team's own 2026 pass EPA per dropback, 1,144 dropbacks | +0.45 |
+| the team's own 2026 sack rate allowed | −0.32 |
+| the team's own 2025 pass EPA per dropback, 20,886 dropbacks | +0.07 |
+| the team's own 2025 sack rate allowed | −0.08 |
+
+It tracks the two weeks already played and carries almost nothing from last
+season, which is what a re-packaging of this year's box score looks like. At the
+game level the O-line advantage correlates +0.51 with the closing spread across
+the 14 week-2 games that join to a line, so most of what it says is already in
+the price.
+
+The puller stores a dated copy every run, which is the only way the rating ever
+becomes testable.
+
+Unverified so far: whether any of this improves a model. The props file is a
 market snapshot, so its first use is measuring our own prop numbers against five
 books at once, not adding a feature.
+
+### `smash_feature.py` — the rating in the published number
+
+Jonathan asked for it in the sheet anyway, told what it is. Every other feature
+here earned its coefficient by being fit on completed games; this one could not,
+because on the day it was written one snapshot existed. So the size is a prior:
+
+```
+adjustment = clip(0.5 * z(their home O-line advantage − away), ±1.5) points
+```
+
+Standardised inside the slate, because a raw 40 on an undocumented scale means
+nothing while *widest line mismatch of the week* is a statement worth sizing.
+Half a point per standard deviation sits below the 1.6 points the missing-starter
+work measured for losing a full-time lineman, and well below it deliberately, since
++0.51 of this already lives in the spread. On week 2 it moved all 16 games and
+changed the side of the line on two, both of them sub-point coin flips.
+
+```bash
+python3 smash_feature.py                      # what it would move, per game
+python3 smash_feature.py --points-per-sd 0    # off, same code path
+python3 smash_feature.py --score              # plain vs nudged, once played
+```
+
+Both numbers go to `data/smash_log.csv` on every build — the plain model and the
+nudged one, with the snapshot date they came from. Around week 13 there are
+enough weeks on disk for `--score` to say which was better, at which point this
+either earns a fitted coefficient or `SMASH_POINTS_PER_SD=0` retires it. The
+week page says in its footer that one input is assumed rather than fit.
 
 ## 10. `input_check.py` — fact-check the inputs before publishing
 
@@ -522,7 +587,7 @@ link before the week's notes exist.
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
-  prop lines and weekly fantasy rankings.
+  prop lines, weekly fantasy rankings, and the NFL SMASH line/coverage ratings.
 - [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
   closing spread/total/moneyline, 1999–present.
 - [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases) —
