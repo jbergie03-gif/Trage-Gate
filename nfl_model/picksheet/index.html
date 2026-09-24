@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ATS pick sheet — 2026 Week 2</title>
+<title>ATS pick sheet — 2026 Week 3</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -102,7 +102,7 @@
 </head>
 <body>
 <header>
-  <h1>Against the spread — 2026 Week 2</h1>
+  <h1>Against the spread — 2026 Week 3</h1>
   <div class="sub">
     Tap a side to pick it. Star up to 2 games for double weight.
     Lines are DraftKings, snapshotted <span id="taken"></span>.
@@ -133,188 +133,188 @@
 <script>
 const GAMES = [
   {
-    "away": "DET",
-    "home": "BUF",
+    "away": "ATL",
+    "home": "GB",
     "day": "Thursday",
     "kick": "Thu 5:15 PM PT",
-    "kickAt": "2026-09-17T17:15:00-07:00",
+    "kickAt": "2026-09-24T17:15:00-07:00",
     "spread": 4.5,
-    "total": 54.5,
-    "devin": "BUF -4.5",
-    "devinNote": "coin flip, no opinion"
+    "total": 42.5,
+    "devin": "GB -4.5",
+    "devinNote": "model edge 1.4, inside its error bar"
   },
   {
-    "away": "CAR",
-    "home": "ATL",
+    "away": "LAC",
+    "home": "BUF",
     "day": "Sunday",
     "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": -2.5,
-    "total": 43.5,
-    "devin": "ATL +2.5",
-    "devinNote": "model edge 7.6",
-    "devinDouble": true
-  },
-  {
-    "away": "NO",
-    "home": "BAL",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": 7.5,
-    "total": 46.5,
-    "devin": "NO +7.5",
-    "devinNote": "model edge 1.9, inside its error bar"
-  },
-  {
-    "away": "MIN",
-    "home": "CHI",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": 4.5,
-    "total": 48.5,
-    "devin": "MIN +4.5",
-    "devinNote": "model edge 3.5"
-  },
-  {
-    "away": "CIN",
-    "home": "HOU",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": 3.0,
-    "total": 46.5,
-    "devin": "HOU -3.0",
-    "devinNote": "model edge 1.5, inside its error bar"
-  },
-  {
-    "away": "PIT",
-    "home": "NE",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": 5.5,
-    "total": 41.5,
-    "devin": "NE -5.5",
-    "devinNote": "model edge 2.7"
-  },
-  {
-    "away": "GB",
-    "home": "NYJ",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": -3.5,
-    "total": 44.5,
-    "devin": "GB -3.5",
-    "devinNote": "model edge 4.4"
-  },
-  {
-    "away": "CLE",
-    "home": "TB",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": 8.5,
-    "total": 41.5,
-    "devin": "CLE +8.5",
-    "devinNote": "model edge 3.1"
-  },
-  {
-    "away": "PHI",
-    "home": "TEN",
-    "day": "Sunday",
-    "kick": "Sun 10:00 AM PT",
-    "kickAt": "2026-09-20T10:00:00-07:00",
-    "spread": -7.0,
-    "total": 39.5,
-    "devin": "TEN +7.0",
-    "devinNote": "coin flip, no opinion"
-  },
-  {
-    "away": "JAX",
-    "home": "DEN",
-    "day": "Sunday",
-    "kick": "Sun 1:05 PM PT",
-    "kickAt": "2026-09-20T13:05:00-07:00",
-    "spread": 2.5,
-    "total": 45.5,
-    "devin": "JAX +2.5",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": 7.0,
+    "total": 50.5,
+    "devin": "BUF -7.0",
     "devinNote": "model edge 4.5",
     "devinDouble": true
   },
   {
-    "away": "LV",
-    "home": "LAC",
+    "away": "CAR",
+    "home": "CLE",
     "day": "Sunday",
-    "kick": "Sun 1:05 PM PT",
-    "kickAt": "2026-09-20T13:05:00-07:00",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": -2.5,
+    "total": 42.5,
+    "devin": "CAR -2.5",
+    "devinNote": "coin flip, no opinion"
+  },
+  {
+    "away": "NYJ",
+    "home": "DET",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
     "spread": 6.5,
-    "total": 43.5,
-    "devin": "LV +6.5",
-    "devinNote": "model edge 1.1, inside its error bar"
+    "total": 47.5,
+    "devin": "DET -6.5",
+    "devinNote": "model edge 3.3"
+  },
+  {
+    "away": "HOU",
+    "home": "IND",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": -2.5,
+    "total": 42.5,
+    "devin": "IND +2.5",
+    "devinNote": "model edge 1.2, inside its error bar"
+  },
+  {
+    "away": "NE",
+    "home": "JAX",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": 3.0,
+    "total": 45.5,
+    "devin": "NE +3.0",
+    "devinNote": "model edge 1.6, inside its error bar"
+  },
+  {
+    "away": "KC",
+    "home": "MIA",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": -10.5,
+    "total": 46.5,
+    "devin": "MIA +10.5",
+    "devinNote": "model edge 3.6"
+  },
+  {
+    "away": "TEN",
+    "home": "NYG",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": 2.5,
+    "total": 39.5,
+    "devin": "NYG -2.5",
+    "devinNote": "coin flip, no opinion"
+  },
+  {
+    "away": "CIN",
+    "home": "PIT",
+    "day": "Sunday",
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": -3.5,
+    "total": 42.5,
+    "devin": "PIT +3.5",
+    "devinNote": "model edge 2.6"
   },
   {
     "away": "SEA",
-    "home": "ARI",
+    "home": "WAS",
     "day": "Sunday",
-    "kick": "Sun 1:25 PM PT",
-    "kickAt": "2026-09-20T13:25:00-07:00",
-    "spread": -3.5,
-    "total": 41.5,
-    "devin": "SEA -3.5",
-    "devinNote": "model edge 2.0, inside its error bar"
+    "kick": "Sun 10:00 AM PT",
+    "kickAt": "2026-09-27T10:00:00-07:00",
+    "spread": -7.0,
+    "total": 40.5,
+    "devin": "WAS +7.0",
+    "devinNote": "coin flip, no opinion"
   },
   {
-    "away": "WAS",
+    "away": "ARI",
+    "home": "SF",
+    "day": "Sunday",
+    "kick": "Sun 1:05 PM PT",
+    "kickAt": "2026-09-27T13:05:00-07:00",
+    "spread": 8.5,
+    "total": 47.5,
+    "devin": "SF -8.5",
+    "devinNote": "coin flip, no opinion"
+  },
+  {
+    "away": "MIN",
+    "home": "TB",
+    "day": "Sunday",
+    "kick": "Sun 1:05 PM PT",
+    "kickAt": "2026-09-27T13:05:00-07:00",
+    "spread": -1.5,
+    "total": 42.5,
+    "devin": "MIN -1.5",
+    "devinNote": "coin flip, no opinion"
+  },
+  {
+    "away": "BAL",
     "home": "DAL",
     "day": "Sunday",
     "kick": "Sun 1:25 PM PT",
-    "kickAt": "2026-09-20T13:25:00-07:00",
-    "spread": 4.5,
-    "total": 50.5,
-    "devin": "WAS +4.5",
-    "devinNote": "model edge 2.1, inside its error bar"
+    "kickAt": "2026-09-27T13:25:00-07:00",
+    "spread": -3.5,
+    "total": 52.5,
+    "devin": "DAL +3.5",
+    "devinNote": "model edge 1.3, inside its error bar"
   },
   {
-    "away": "MIA",
-    "home": "SF",
+    "away": "LV",
+    "home": "NO",
     "day": "Sunday",
     "kick": "Sun 1:25 PM PT",
-    "kickAt": "2026-09-20T13:25:00-07:00",
-    "spread": 13.5,
-    "total": 44.5,
-    "devin": "MIA +13.5",
-    "devinNote": "model edge 2.8"
+    "kickAt": "2026-09-27T13:25:00-07:00",
+    "spread": 3.0,
+    "total": 43.5,
+    "devin": "NO -3.0",
+    "devinNote": "model edge 1.6, inside its error bar"
   },
   {
-    "away": "IND",
-    "home": "KC",
+    "away": "LA",
+    "home": "DEN",
     "day": "Sunday",
     "kick": "Sun 5:20 PM PT",
-    "kickAt": "2026-09-20T17:20:00-07:00",
-    "spread": 6.5,
-    "total": 46.5,
-    "devin": "IND +6.5",
-    "devinNote": "model edge 1.0, inside its error bar"
+    "kickAt": "2026-09-27T17:20:00-07:00",
+    "spread": -2.5,
+    "total": 44.5,
+    "devin": "DEN +2.5",
+    "devinNote": "model edge 1.4, inside its error bar"
   },
   {
-    "away": "NYG",
-    "home": "LA",
+    "away": "PHI",
+    "home": "CHI",
     "day": "Monday",
     "kick": "Mon 5:15 PM PT",
-    "kickAt": "2026-09-21T17:15:00-07:00",
-    "spread": 7.0,
-    "total": 47.5,
-    "devin": "NYG +7.0",
-    "devinNote": "coin flip, no opinion"
+    "kickAt": "2026-09-28T17:15:00-07:00",
+    "spread": -4.5,
+    "total": 41.5,
+    "devin": "CHI +4.5",
+    "devinNote": "model edge 6.2",
+    "devinDouble": true
   }
 ];
-const TAKEN = "2026-09-16 15:26 PT";
-const KEY = "ats-2026-w02";
+const TAKEN = "2026-09-23 22:16 PT";
+const KEY = "ats-2026-w03";
 const MAX_STARS = 2;
-const SLATE = "2026-w02";
+const SLATE = "2026-w03";
 
 // spread is the home-team view: positive means the home team is favored. It is
 // null for a game the book has not put a number on yet.

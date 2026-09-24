@@ -385,3 +385,111 @@ Model with Wentz: CHI by 2.0, so the edge falls to **2.5**.
 
 Neither published pick changes — MIN +4.5 and ATL +2.5 stay as filed, and the
 two doubles stay on ATL and JAX. Both numbers are softer than the sheet shows.
+
+## Week 2 results — scored 2026-09-20 18:45 PT (14 of 16 final)
+
+IND @ KC (SNF) and NYG @ LA (MNF) are not played yet, so both cards are
+unfinished. Graded on the lines as filed on the sheet, doubles worth two.
+
+| Game | Score | Line | Devin | | Jonathan | |
+|---|---|---|---|---|---|---|
+| DET @ BUF | 31-41 | BUF -4.5 | BUF | W | BUF | W |
+| CAR @ ATL | 34-3 | CAR -2.5 | ATL (dbl) | **L** | CAR | W |
+| NO @ BAL | 24-17 | BAL -7.5 | NO | W | BAL | L |
+| MIN @ CHI | 9-3 | CHI -4.5 | MIN | W | CHI | L |
+| CIN @ HOU | 20-6 | HOU -3 | HOU | L | HOU | L |
+| PIT @ NE | 3-20 | NE -5.5 | NE | W | PIT | L |
+| GB @ NYJ | 20-17 | GB -3.5 | GB | L | NYJ | W |
+| CLE @ TB | 23-19 | TB -8.5 | CLE | W | TB | L |
+| PHI @ TEN | 24-20 | PHI -7 | TEN | W | PHI (dbl) | **L** |
+| JAX @ DEN | 13-20 | DEN -2.5 | JAX (dbl) | **L** | DEN | W |
+| LV @ LAC | 26-14 | LAC -6.5 | LV | W | LAC | L |
+| SEA @ ARI | 31-7 | SEA -3.5 | SEA | W | SEA | W |
+| WAS @ DAL | 20-37 | DAL -4.5 | WAS | L | DAL | W |
+| MIA @ SF | 13-35 | SF -13.5 | MIA | L | SF (dbl) | **W** |
+
+Devin 8-6 straight, but both doubles lost: **0 points**.
+Jonathan 7-7 straight, double hit: **0 points**. Tied with two games left.
+
+Model accuracy on the 14 games: margin MAE 12.61 unadjusted, 12.52 with the
+SMASH nudge, closing line 12.07. Straight-up 7-7. The market beat the model
+again, as it has over 1,962 games.
+
+**The SMASH adjustment's first scored week was negative.** It changed the side
+of the line on two games and lost both: DET @ BUF (4.51 -> 4.45 across a 4.5
+line, BUF covered) and PHI @ TEN (-6.91 -> -7.80 across -7, TEN covered). ATS
+8-6 without it, 6-8 with it. One week of 14 games decides nothing, but it is
+the direction predicted when the thing was installed.
+
+Atlanta: the quarterback question resolved the worst possible way for the
+double. Verify who actually started before writing this up further.
+
+## Two-week standing — 2026-09-20 19:10 PT
+
+Head-to-head card totals (Week 2's IND @ KC and NYG @ LA still unplayed):
+
+| | W1 pts | W2 pts | Total | Straight |
+|---|---:|---:|---:|---|
+| Jonathan | 8 | 0 | **8** | 13-14 |
+| Devin (model) | 4 | 0 | **4** | 11-16 |
+
+Model against the closing line, published numbers only: Week 1 margin error
+11.3 vs 10.6, Week 2 12.61 vs 12.52 (SMASH) vs 12.07 market. Two weeks, model
+behind by roughly half a point of average error per game — the same ordering as
+the 1,962-game backtest, and far too small a sample to mean anything on its own.
+
+Site: gridironmath.com live over HTTPS, 0 subscribers, weekly email not built.
+
+## Week 3 — filed 2026-09-23 22:30 PT, before any kickoff
+
+Model refit on every completed game through Week 2. Lines are the DraftKings
+snapshot taken 2026-09-23 22:16 PT. `model` is the home-team margin after the
+SMASH nudge; `plain` is the same number before it.
+
+| Game | Line | Plain | SMASH | Model | Devin pick | Edge |
+|---|---:|---:|---:|---:|---|---:|
+| ATL @ GB | GB -4.5 | 6.16 | -0.24 | 5.91 | GB -4.5 | 1.4 |
+| LAC @ BUF | BUF -7 | 10.63 | +0.89 | 11.52 | BUF -7 (dbl) | 4.5 |
+| CAR @ CLE | CAR -2.5 | -2.23 | -0.39 | -2.63 | CAR -2.5 | 0.1 |
+| NYJ @ DET | DET -6.5 | 9.91 | -0.13 | 9.78 | DET -6.5 | 3.3 |
+| HOU @ IND | HOU -2.5 | -1.31 | -0.01 | -1.33 | IND +2.5 | 1.2 |
+| NE @ JAX | JAX -3 | 0.88 | +0.53 | 1.41 | NE +3 | 1.6 |
+| KC @ MIA | KC -10.5 | -5.69 | -1.22 | -6.90 | MIA +10.5 | 3.6 |
+| TEN @ NYG | NYG -2.5 | 2.90 | +0.11 | 3.01 | NYG -2.5 | 0.5 |
+| CIN @ PIT | CIN -3.5 | -1.05 | +0.18 | -0.87 | PIT +3.5 | 2.6 |
+| SEA @ WAS | SEA -7 | -6.40 | -0.28 | -6.68 | WAS +7 | 0.3 |
+| ARI @ SF | SF -8.5 | 8.15 | +1.00 | 9.16 | SF -8.5 | 0.7 |
+| MIN @ TB | MIN -1.5 | -1.93 | -0.04 | -1.98 | MIN -1.5 | 0.5 |
+| BAL @ DAL | BAL -3.5 | -2.26 | +0.06 | -2.19 | DAL +3.5 | 1.3 |
+| LV @ NO | NO -3 | 4.73 | -0.10 | 4.63 | NO -3 | 1.6 |
+| LA @ DEN | LA -2.5 | -0.98 | -0.13 | -1.11 | DEN +2.5 | 1.4 |
+| PHI @ CHI | PHI -4.5 | 1.92 | -0.24 | 1.69 | CHI +4.5 (dbl) | 6.2 |
+
+Doubles: BUF -7 and CHI +4.5, the two largest disagreements with the line.
+Six games sit inside the model's error bar (edge under ~1.5) and are coin
+flips, not opinions.
+
+SMASH changed the side of the line on two games this week, both of them coin
+flips beforehand: CAR @ CLE (-2.23 -> -2.63 across -2.5) and ARI @ SF (8.15 ->
+9.16 across 8.5). Both numbers are logged so the December scoring can tell
+which was better.
+
+Verified before filing (facts):
+- ATL: Michael Penix Jr. named the Week 3 starter; Tua Tagovailoa backup.
+  Samson Ebukam out (hamstring). The model's assumed starter is correct.
+- MIN: Kyler Murray cleared concussion protocol and starts at Tampa Bay. The
+  model's assumed starter is correct.
+- CHI: Caleb Williams is week-to-week with a Grade 1 right hamstring strain and
+  did not practise Wednesday; Tyson Bagent entered concussion protocol Tuesday
+  and is not in the building. Case Keenum took first-team snaps Wednesday. Ben
+  Johnson: "not sure who the starter's going to be on Monday night."
+
+Unknown: Chicago's starter. The CHI +4.5 double is priced on Keenum, the
+likeliest starter as of Wednesday. If Williams plays the model likes Chicago
+more, not less (edge 6.2 -> 7.3), so the double does not depend on Keenum
+starting; it depends on the market being wrong about a backup, which is the
+same bet that lost on Atlanta in Week 2.
+
+Unknown: the injury report carries zero Out/Doubtful/Questionable designations
+for Week 3 yet, so the model is pricing all 32 teams as fully healthy. Re-run
+after Friday's report.
