@@ -118,7 +118,7 @@
 
 <div class="note">
   Scoring: 1 point per correct side, 2 points per starred game, pushes void.
-  __SCORING__ Devin's card is hidden until you send yours,
+  <span id="scoring"></span> Devin's card is hidden until you send yours,
   so your picks are your own. Re-sending before kickoff is fine — it files a new
   revision with its own timestamp rather than overwriting the earlier card.
 </div>
@@ -220,6 +220,13 @@ function render() {
   const stars = state.stars.filter(Boolean).length;
   document.getElementById("count").textContent =
     `${picked}/${open().length} picked, ${stars}/${MAX_STARS} double weight`;
+  // Counted here rather than at build time: a sheet left open through kickoff
+  // loses games from the card, and the prose has to lose them too.
+  const live = open().length;
+  const doubles = Math.min(MAX_STARS, live);
+  document.getElementById("scoring").textContent =
+    `${live} game(s) still open of ${GAMES.length} this week, ` +
+    `${live + doubles} points available.`;
 }
 
 document.addEventListener("click", (e) => {
