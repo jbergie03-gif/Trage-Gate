@@ -170,8 +170,6 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
     title = f"{season} Week {week}"
     # With one game left there is no point offering two doubles.
     doubles = min(stars, len(live))
-    scoring = (f"{len(live)} game(s) still open of {len(games)} this week, "
-               f"{len(live) + doubles} points available.")
     # The sheet recomputes locked from kickAt against the reader's clock, so
     # the build-time flag is a build detail and does not ship.
     for g in games:
@@ -182,7 +180,6 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
     for key, val in (("__TITLE__", title),
                      ("__SLATE__", slate),
                      ("__TAKEN__", stamp or "the schedule, no DK snapshot"),
-                     ("__SCORING__", scoring),
                      ("__MAX_STARS__", str(doubles)),
                      ("__GAMES__", json.dumps(games, indent=2))):
         page = page.replace(key, val)
