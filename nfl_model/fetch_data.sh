@@ -35,4 +35,11 @@ for year in $(seq 2016 2025); do
 done
 wait
 
+# Rebuild what the model actually reads. Downloading the raw feeds without this
+# leaves the derived files at whatever week they were last built, which is how
+# the week-3 sheet went out on an injury burden that stopped at week 2.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python3 "$HERE/build_features.py" --data "$DIR"
+python3 "$HERE/injuries.py" --data "$DIR"
+
 du -sh "$DIR"

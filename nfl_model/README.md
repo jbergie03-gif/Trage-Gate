@@ -232,6 +232,15 @@ captures for week 1.
 python3 injuries.py                  # writes data/injury_burden.csv
 ```
 
+`fetch_data.sh` runs this, and `build_features.py`, after every download.
+Downloading the feeds alone leaves the derived files at whatever week they were
+last built. Through week 3 of 2026 this was latent rather than harmful — the
+injury feed had not published week-3 designations when the sheet went out, so
+nothing was being ignored — but the file only reached week 3 when `injuries.py`
+was re-run four days later, by which point the feed carried 119 designated
+players for that week. A download that is current and a burden file that is
+current are two different things, so `input_check.py` now reports both.
+
 Counting injured bodies measures nothing: a team can list eight names and lose
 nobody who plays. Each player on the report is instead weighted by the snap
 share he had been taking, and by how often his designation actually sits (Out
@@ -470,7 +479,7 @@ Unverified so far: whether any of this improves a model. The props file is a
 market snapshot, so its first use is measuring our own prop numbers against five
 books at once, not adding a feature.
 
-### `smash_feature.py` — the rating in the published number
+### `smash_feature.py` — the rating beside the published number
 
 Jonathan asked for it in the sheet anyway, told what it is. Every other feature
 here earned its coefficient by being fit on completed games; this one could not,
@@ -489,15 +498,23 @@ changed the side of the line on two, both of them sub-point coin flips.
 
 ```bash
 python3 smash_feature.py                      # what it would move, per game
-python3 smash_feature.py --points-per-sd 0    # off, same code path
+python3 smash_feature.py --apply              # and move it
 python3 smash_feature.py --score              # plain vs nudged, once played
 ```
 
-Both numbers go to `data/smash_log.csv` on every build — the plain model and the
-nudged one, with the snapshot date they came from. Around week 13 there are
-enough weeks on disk for `--score` to say which was better, at which point this
-either earns a fitted coefficient or `SMASH_POINTS_PER_SD=0` retires it. The
-week page says in its footer that one input is assumed rather than fit.
+**It is measured but no longer published.** Two scored weeks, 30 games: the
+plain number went 19-11 against the spread and the nudged one 15-15, and every
+one of the four games it moved across the line lost. So `SMASH_APPLY` defaults
+to off and the sheet goes out on the model alone.
+
+That retires the number, not the experiment. `apply` still computes
+`smash_adj` every build and `log` still writes it to `data/smash_log.csv` with
+the snapshot date, and `score` reconstructs the nudged number as
+`pred_margin_plain + smash_adj` rather than reading the published column — so
+the comparison keeps accumulating toward the week-13 out-of-sample test whether
+or not anyone is acting on it. `pred_margin` in that log is what actually went
+out, which is why the two columns are equal from week 4 on. `SMASH_APPLY=1`
+puts it back in the number.
 
 ## 10. `input_check.py` — fact-check the inputs before publishing
 

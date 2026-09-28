@@ -222,6 +222,22 @@ def check(season, week, data, swaps=None):
         L.append("- **the model is pricing all 32 teams as fully healthy.** "
                  "Designations are not published until Friday, so its three "
                  "injury features are zero for every game on this slate.")
+
+    # The feed being current is not the same as the file the model reads being
+    # current: `injuries.py` has to be re-run after a download or the burden
+    # silently stays at the week it was last built.
+    # A healthy team has no row at all, so the test is which weeks exist, not
+    # how many teams are listed.
+    burden = inj_burden[inj_burden["season"] == season]
+    latest = int(burden["week"].max()) if len(burden) else 0
+    priced = int((burden["week"] == week).sum())
+    L.append(f"- teams carrying an injury burden in week {week}: "
+             f"**{priced}** (file built through week {latest or 'none'})")
+    if designated and not priced:
+        L.append(f"- **the burden file is behind the injury feed.** The report "
+                 f"designates {designated} players this week and the model "
+                 "prices none of them. Re-run `injuries.py`, or "
+                 "`fetch_data.sh`, which now does it after every download.")
     L.append("")
 
     # ---- 2. quarterback by quarterback -----------------------------------
