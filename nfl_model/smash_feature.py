@@ -23,8 +23,16 @@ are enough weeks on disk to score adjusted against unadjusted out of sample and
 either fit the real coefficient or switch this off. Until then a printed number
 is a labelled guess.
 
-    python3 smash_feature.py --season 2026 --week 3      # what it would move
-    python3 smash_feature.py --points-per-sd 0            # off, same code path
+It is now measured but not published. Its first two scored weeks changed the
+published side of four games and lost all four -- 18-10 against the spread on
+the plain number against 14-14 on the nudged one -- so `APPLY` is off and the
+sheet goes out on the plain model. Nothing else changes: the adjustment is
+still computed and logged every build, and `score` reconstructs the nudged
+number from `pred_margin_plain + smash_adj`, so the comparison keeps
+accumulating for December whether or not anyone is acting on it.
+
+    python3 smash_feature.py --season 2026 --week 4      # what it would move
+    SMASH_APPLY=1 python3 picksheet_build.py              # publish it again
 """
 import argparse
 import datetime
@@ -40,6 +48,8 @@ LOG = os.path.join(DATA, "smash_log.csv")
 
 POINTS_PER_SD = float(os.environ.get("SMASH_POINTS_PER_SD", "0.5"))
 CAP = float(os.environ.get("SMASH_CAP", "1.5"))
+APPLY = os.environ.get("SMASH_APPLY", "0").lower() not in ("", "0", "false",
+                                                           "no")
 
 # Their matchups page spells four teams differently from nflverse. Silently
 # dropping one is how a game quietly stops being adjusted, so `apply` counts
@@ -91,12 +101,16 @@ def points(adv, points_per_sd=None, cap=None):
     return (pps * (adv - adv.mean()) / sd).clip(-lid, lid)
 
 
-def apply(slate, points_per_sd=None, cap=None, path=None):
-    """Add `smash_adj` and shift `pred_margin`, keeping the original.
+def apply(slate, points_per_sd=None, cap=None, path=None, publish=None):
+    """Measure `smash_adj`, and shift `pred_margin` only when publishing it.
 
-    `pred_margin_plain` is the model as it was before this file existed. Every
-    caller can therefore report both, and the log can score both later.
+    `pred_margin_plain` is the model as it was before this file existed and
+    `pred_margin` is whatever is being published, so callers report both and
+    the log records what actually went out. `smash_adj` is measured either way:
+    with `publish` false it is a column to look at rather than a number acting
+    on a pick.
     """
+    publish = APPLY if publish is None else publish
     slate = slate.copy()
     slate["pred_margin_plain"] = slate["pred_margin"]
     slate["smash_adj"] = 0.0
@@ -113,7 +127,8 @@ def apply(slate, points_per_sd=None, cap=None, path=None):
         return slate
     adjusted = points(matched.dropna(), points_per_sd, cap)
     slate.loc[adjusted.index, "smash_adj"] = adjusted
-    slate["pred_margin"] = slate["pred_margin_plain"] + slate["smash_adj"]
+    if publish:
+        slate["pred_margin"] = slate["pred_margin_plain"] + slate["smash_adj"]
     slate["smash_as_of"] = adv["as_of"].iloc[0]
     return slate
 
@@ -123,7 +138,9 @@ def log(slate, season, week, path=LOG):
 
     Written every build, one row per game per snapshot date. Re-running a build
     appends again on purpose: the rows are a record of what was published when,
-    not a table to be kept unique.
+    not a table to be kept unique. `pred_margin` is therefore the published
+    number and equals `pred_margin_plain` in the weeks the nudge was measured
+    but not acted on; the nudge itself is always in `smash_adj`.
     """
     if "smash_adj" not in slate:
         return None
@@ -164,8 +181,14 @@ def score(path=LOG, games=None):
                 how="inner", suffixes=("", "_g"))
     if m.empty:
         return None
-    out = {"n": len(m)}
-    for name, col in (("plain", "pred_margin_plain"), ("smash", "pred_margin")):
+    # Rebuilt rather than read from `pred_margin`, which is only the nudged
+    # number in weeks it was published. The comparison has to keep running
+    # while it is switched off, or switching it off ends the evidence.
+    m["nudged"] = m["pred_margin_plain"] + m["smash_adj"]
+    out = {"n": len(m), "published_nudged": int((m["pred_margin"]
+                                                 != m["pred_margin_plain"])
+                                                .sum())}
+    for name, col in (("plain", "pred_margin_plain"), ("smash", "nudged")):
         live = m[m["result"] != m["spread_line"]]
         out[f"{name}_mae"] = (m[col] - m["result"]).abs().mean()
         out[f"{name}_ats"] = (((live[col] - live["spread_line"])
@@ -184,6 +207,9 @@ def main():
     ap.add_argument("--cap", type=float, default=CAP)
     ap.add_argument("--snapshot", help="a matchups.csv to use instead of the "
                                        "newest one on disk")
+    ap.add_argument("--apply", action="store_true", default=APPLY,
+                    help="publish the nudged number rather than only "
+                         "reporting what it would move")
     ap.add_argument("--score", action="store_true",
                     help="score the log against results instead")
     a = ap.parse_args()
@@ -193,7 +219,8 @@ def main():
         if not s:
             print("nothing in the log has been played yet")
             return
-        print(f"{s['n']} logged games played")
+        print(f"{s['n']} logged games played, {s['published_nudged']} of them "
+              "published on the nudged number")
         for name in ("plain", "smash"):
             ats = s[f"{name}_ats"]
             print(f"  {name:6s} margin MAE {s[f'{name}_mae']:.2f}"
@@ -212,18 +239,21 @@ def main():
     if season is None or week is None:
         season, week = game_model.next_slate(df)
     slate = apply(game_model.predict_slate(df, season, week),
-                  a.points_per_sd, a.cap, a.snapshot)
+                  a.points_per_sd, a.cap, a.snapshot, a.apply)
     if slate.empty:
         print("no slate with a posted line")
         return
+    nudged = slate["pred_margin_plain"] + slate["smash_adj"]
     print(f"\n{season} week {week}   {a.points_per_sd} pts per sd, "
-          f"cap {a.cap}\n")
-    print(f"{'game':<10} {'line':>6} {'plain':>7} {'smash':>7} {'final':>7}"
+          f"cap {a.cap}, "
+          + ("published" if a.apply else "measured only, plain published")
+          + "\n")
+    print(f"{'game':<10} {'line':>6} {'plain':>7} {'smash':>7} {'nudged':>7}"
           f"  {'edge':>6}")
-    for r in slate.itertuples():
+    for r, nudge in zip(slate.itertuples(), nudged):
         print(f"{r.away_team}@{r.home_team:<6} {r.spread_line:+6.1f} "
               f"{r.pred_margin_plain:+7.1f} {r.smash_adj:+7.2f} "
-              f"{r.pred_margin:+7.1f}  {r.pred_margin - r.spread_line:+6.1f}")
+              f"{nudge:+7.1f}  {r.pred_margin - r.spread_line:+6.1f}")
     adv = advantage(a.snapshot)
     pairs = set(zip(adv.away, adv.home))
     missing = [f"{r.away_team}@{r.home_team}" for r in slate.itertuples()
@@ -232,9 +262,9 @@ def main():
         print(f"not on their matchups page: {', '.join(missing)}")
     moved = (slate["smash_adj"].abs() > 0.01).sum()
     flips = ((slate["pred_margin_plain"] - slate["spread_line"] > 0)
-             != (slate["pred_margin"] - slate["spread_line"] > 0)).sum()
-    print(f"\n{moved} of {len(slate)} games moved, {flips} changed side "
-          f"of the line")
+             != (nudged - slate["spread_line"] > 0)).sum()
+    print(f"\n{moved} of {len(slate)} games moved, {flips} would change side "
+          "of the line" + ("" if a.apply else " if it were published"))
 
 
 if __name__ == "__main__":
