@@ -493,3 +493,62 @@ same bet that lost on Atlanta in Week 2.
 Unknown: the injury report carries zero Out/Doubtful/Questionable designations
 for Week 3 yet, so the model is pricing all 32 teams as fully healthy. Re-run
 after Friday's report.
+
+## Week 2 closed out — scored 2026-09-27
+
+| Game | Score | Line | Devin | | Jonathan | |
+|---|---|---|---|---|---|---|
+| IND @ KC | 30-33 | KC -6.5 | IND | W | KC | L |
+| NYG @ LA | 6-28 | LA -7 | NYG | L | LA | W |
+
+Final Week 2: Devin 9-7 straight, 1 point. Jonathan 8-8 straight, 1 point.
+
+## Week 3 results — scored 2026-09-27 18:15 PT (14 of 16 final)
+
+LA @ DEN (SNF) and PHI @ CHI (MNF) are not played. Graded on the lines as
+filed, doubles worth two.
+
+| Game | Score | Line | Devin | | Jonathan | |
+|---|---|---|---|---|---|---|
+| ATL @ GB | 35-14 | GB -4.5 | GB | L | ATL | W |
+| LAC @ BUF | 16-24 | BUF -7 | BUF (dbl) | **W** | BUF | W |
+| CAR @ CLE | 18-21 | CAR -2.5 | CAR | L | CAR | L |
+| NYJ @ DET | 24-31 | DET -6.5 | DET | W | NYJ | L |
+| HOU @ IND | 17-19 | HOU -2.5 | IND | W | HOU | L |
+| NE @ JAX | 6-35 | JAX -3 | NE | L | JAX | W |
+| KC @ MIA | 24-10 | KC -10.5 | MIA | L | KC | W |
+| TEN @ NYG | 7-12 | NYG -2.5 | NYG | W | TEN | L |
+| CIN @ PIT | 27-30 | CIN -3.5 | PIT | W | CIN | L |
+| SEA @ WAS | 31-33 | SEA -7 | WAS | W | SEA (dbl) | **L** |
+| ARI @ SF | 30-36 | SF -8.5 | SF | L | SF | L |
+| MIN @ TB | 23-16 | MIN -1.5 | MIN | W | MIN | W |
+| BAL @ DAL | 34-31 | BAL -3.5 | DAL | W | DAL | W |
+| LV @ NO | 35-27 | NO -3 | NO | L | LV | W |
+
+Devin 8-6 straight, double hit: **9 points**.
+Jonathan 7-7 straight, double lost: **7 points**.
+
+Model accuracy on the 14 games: margin MAE 8.06 unadjusted, 8.07 with the SMASH
+nudge, closing line 7.43. The market beat the model again, by 0.6 points of
+average error per game.
+
+**SMASH's second scored week was negative again.** It changed the side of the
+line on CAR @ CLE and ARI @ SF and lost both. Model ATS on the 14 games: 10-4
+unadjusted, 8-6 as published with the nudge. Cumulative since it was installed:
+18-10 plain, 14-14 adjusted. Two weeks is not a verdict, but it has now cost
+four games and gained none, and both weeks moved in the direction predicted
+when it went in.
+
+## Three-week standing — 2026-09-27 18:20 PT (Week 3's SNF and MNF unplayed)
+
+| | W1 | W2 | W3 | Total | Straight |
+|---|---:|---:|---:|---:|---|
+| Jonathan | 8 | 1 | 7 | **16** | 21-22 |
+| Devin (model) | 4 | 1 | 9 | **14** | 20-23 |
+
+Still live: LA @ DEN (Devin DEN +2.5, Jonathan LA -2.5) and PHI @ CHI (Devin
+CHI +4.5 double, Jonathan PHI -4.5 double). Devin can reach 17, Jonathan 19.
+
+Standing caveat: 20-23 against the spread over three weeks, and the model's
+margin error is behind the closing line in all three. The record is the
+product, not an edge claim.
