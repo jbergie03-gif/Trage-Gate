@@ -272,7 +272,8 @@ function verdict(g, i, dev) {
   const mine = state.picks[i];
   const word = !mine ? "No pick" : mine === dev ? "Agree" : "Split";
   const cls = !mine ? "" : mine === dev ? " agree" : " split";
-  return `<div class="verdict${cls}"><span class="word">${word}</span><span>${g.devinNote}</span></div>`;
+  const tot = g.modelTotal == null ? "" : ` &middot; model total ${g.modelTotal.toFixed(1)} (priced ${g.blendTotal.toFixed(1)}), ${g.totalNote}`;
+  return `<div class="verdict${cls}"><span class="word">${word}</span><span>${g.devinNote}${tot}</span></div>`;
 }
 
 function reveal(header) {

@@ -26,6 +26,7 @@ import pandas as pd
 import game_model
 import input_check
 import smash_feature
+import total_model
 import weekly_post
 
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
@@ -103,6 +104,8 @@ def rows(df, season, week, stars=STARS, now=None):
     slate = smash_feature.apply(game_model.predict_slate(df, season, week))
     smash_feature.log(slate, season, week)
     pred = {r.game_id: r.pred_margin for r in slate.itertuples()}
+    totals = {r.game_id: (r.pred_total, r.blend_total)
+              for r in total_model.predict_slate(df, season, week).itertuples()}
     now = now or datetime.datetime.now(PACIFIC)
 
     out = []
@@ -127,10 +130,17 @@ def rows(df, season, week, stars=STARS, now=None):
         home = edge > 0
         team = r.home_team if home else r.away_team
         num = -spread if home else spread
+        model_total, blend_total = totals.get(r.game_id, (None, None))
         out.append(dict(
             g, spread=round(float(spread), 1), total=round(float(total), 1),
             devin=f"{team} {'+' if num > 0 else ''}{num:.1f}",
             devinNote=note(edge),
+            modelTotal=(None if model_total is None
+                        else round(float(model_total), 1)),
+            blendTotal=(None if blend_total is None
+                        else round(float(blend_total), 1)),
+            totalNote=("" if model_total is None
+                       else total_model.note(model_total - total)),
             _locked=started,
             _edge=abs(edge),
         ))

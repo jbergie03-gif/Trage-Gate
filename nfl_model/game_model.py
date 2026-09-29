@@ -14,7 +14,8 @@ Design choices worth knowing before reading the numbers:
   gets squeezed. Features are standardized first, otherwise the penalty
   falls almost entirely on EPA (which lives on a 0.1 scale and needs a large
   coefficient) and barely touches the 0/1 dummies.
-* Two targets: margin (home - away) and total points.
+* Two targets: margin (home - away) and total points. The totals target is
+  scored here for the record; `total_model.py` is the fit built for it.
 
 Usage:
     python3 game_model.py --report
@@ -68,6 +69,23 @@ FEATURES = [
     "primetime", "late_window", "week1", "div_game",
     "dome", "wind", "cold", "turf", "neutral",
 ]
+
+# Columns the totals model reads. Every `net_` feature above is a difference
+# of the two teams, which is the right shape for a margin and cancels for a
+# total: a shootout and a slog have the same `net_epa_play`. These are the
+# sums instead, plus each team's points-scored and points-allowed pace and
+# the league's running scoring level, none of which a margin can use.
+TOTAL_EXTRA = [
+    *[f"off_sum_{m}" for m in NET],
+    *[f"def_sum_{m}" for m in NET],
+    "qb_sum", "qb_new_sum", "inj_off_sum", "inj_def_sum",
+    "pts_pace", "pts_pace_home", "pts_pace_away", "league_total", "temp",
+]
+
+PTS_K = 0.15            # per-game learning rate on a team's scoring pace
+PTS_CARRY = 0.70        # carried into the next season, like the ratings
+LEAGUE_K = 0.03         # per-game rate on the league-wide total
+LEAGUE_TOTAL0 = 44.5    # starting point before any game is seen
 
 
 def haversine(a, b):
@@ -157,11 +175,26 @@ def build(g, tg, inj=None, with_ratings=False):
     rows = []
     g = g.sort_values(["season", "week", "gameday", "gametime"])
 
+    # Points scored and allowed per game, as a deviation from the league
+    # level, so a team's pace survives a change in the league's own level.
+    pf, pa = {}, {}
+    league_total = LEAGUE_TOTAL0
+    season_seen = None
+
     for _, row in g.iterrows():
         r.new_season(row["season"])
+        if season_seen is not None and row["season"] != season_seen:
+            for d in (pf, pa):
+                for t in d:
+                    d[t] *= PTS_CARRY
+        season_seen = row["season"]
         home, away = row["home_team"], row["away_team"]
         net = {f"net_{m}": (r.o(m, home) - r.d(m, away))
                - (r.o(m, away) - r.d(m, home)) for m in NET}
+        off_sum = {f"off_sum_{m}": r.o(m, home) + r.o(m, away) for m in NET}
+        def_sum = {f"def_sum_{m}": r.d(m, home) + r.d(m, away) for m in NET}
+        pace_home = pf.get(home, 0.0) + pa.get(home, 0.0)
+        pace_away = pf.get(away, 0.0) + pa.get(away, 0.0)
         tend = {}
         for m in TEND:
             tend[f"sum_{m}"] = r.t(m, home) + r.t(m, away)
@@ -192,10 +225,23 @@ def build(g, tg, inj=None, with_ratings=False):
             gameday=row["gameday"], home_team=home, away_team=away,
             spread_line=row["spread_line"], total_line=row["total_line"],
             result=row["result"], total=row["total"],
-            **net, **tend,
+            **net, **tend, **off_sum, **def_sum,
             qb_diff=qh - qa,
+            qb_sum=qh + qa,
             qb_new_home=1 if r.qb_seen(row.get("home_qb_id")) < 200 else 0,
             qb_new_away=1 if r.qb_seen(row.get("away_qb_id")) < 200 else 0,
+            qb_new_sum=int(r.qb_seen(row.get("home_qb_id")) < 200)
+            + int(r.qb_seen(row.get("away_qb_id")) < 200),
+            inj_off_sum=ih_off + ia_off,
+            inj_def_sum=ih_def + ia_def,
+            # Half the sum of both teams' (scored + allowed) deviations: the
+            # expected total above the league level if each team played to
+            # its own recent pace against the other's.
+            pts_pace=(pace_home + pace_away) / 2,
+            pts_pace_home=pace_home,
+            pts_pace_away=pace_away,
+            league_total=league_total,
+            temp=float(temp),
             # Signed so positive favours the home team: the away side missing
             # more of its offense should lift the home margin.
             inj_off_diff=ia_off - ih_off,
@@ -220,6 +266,13 @@ def build(g, tg, inj=None, with_ratings=False):
         played = tg_by_game.get(row["game_id"])
         if played and pd.notna(row["result"]):
             r.update_game(played)
+        if pd.notna(row["total"]) and pd.notna(row["home_score"]):
+            hs, as_ = float(row["home_score"]), float(row["away_score"])
+            half = league_total / 2
+            for team, scored, allowed in ((home, hs, as_), (away, as_, hs)):
+                pf[team] = pf.get(team, 0.0) + PTS_K * ((scored - half) - pf.get(team, 0.0))
+                pa[team] = pa.get(team, 0.0) + PTS_K * ((allowed - half) - pa.get(team, 0.0))
+            league_total += LEAGUE_K * (float(row["total"]) - league_total)
 
     out = pd.DataFrame(rows)
     # The ratings object is the pre-game state after every finished game, so a
