@@ -393,6 +393,52 @@ week-1 favorite result, and driven by the same 16-games-a-year sample.
 model knows slightly more about totals than about sides, and "slightly more"
 is a quarter of a point.
 
+### `total_model.py` — a fit built for the total
+
+The numbers above come from the margin model's design matrix, whose
+efficiency columns are all *differences* between the two teams. A difference
+cancels for a total: a shootout and a slog have the same `net_epa_play`.
+`total_model.py` fits the total on the sums instead — both offenses, both
+defenses, both quarterbacks (`qb_sum`), each team's running points-scored and
+points-allowed pace, the league's running scoring level — plus wind and
+temperature as continuous inputs.
+
+```bash
+python3 total_model.py --report              # walk-forward vs the close
+python3 total_model.py --predict 2026-09-28  # one slate, both numbers
+```
+
+Same walk-forward, 2,007 out-of-sample games 2019–2026:
+
+| | total MAE |
+|---|---|
+| margin-matrix total (above) | 10.91 |
+| **`total_model.py`** | **10.63** |
+| line + k·(model − line), k fit on prior seasons | 10.41 |
+| Closing total | 10.39 |
+
+The sums close a third of the gap to the market on their own. What carries
+the fit, by bootstrap z: `qb_sum` (+0.84 pts per sd, z=4.6), `wind` (−0.92
+per sd, z=−4.5), a new quarterback on either side (−0.59, z=−3.4),
+temperature (+0.60, z=3.4), and `pts_pace` (+0.61, z=3.1). Primetime games
+run about a point light (z=−2.1). `league_total` adds nothing once the pace
+columns are in.
+
+It still does not beat the close. O/U taking the model's side is 49.3%
+(980/1,988), and the disagreement coefficient is +0.146 (t=1.05) — *lower*
+than the margin-matrix version's +0.237, because a model that is closer to
+the market has less left to disagree about. By season: +0.39, −0.15, +0.23,
++0.23, +0.89, −0.06, +0.89 for 2019–2025; the two years it clears t=1.9 are
+the same two the old fit leaned on.
+
+So the file produces two numbers and labels them. `pred_total` is the model
+alone and is what gets scored. `blend_total = line + k·(pred − line)` with
+k fit walk-forward on scored seasons (0.15 at the moment) is the best
+estimate of the score, and it is within 0.02 MAE of the line, which is to
+say it *is* the line with a tenth of a point of opinion on top. The sheet
+shows both under each game once the card is revealed, with the O/U note on
+the same coin-flip / inside-the-error-bar scale as the spread note.
+
 ## 9. `fantasyguru_pull.py` — the one paid feed
 
 Fantasy Guru has no API. Their support (Rusty, 2026-09-12) wrote that
