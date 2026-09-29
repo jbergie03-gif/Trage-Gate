@@ -199,7 +199,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--coefs", action="store_true")
-    ap.add_argument("--predict", help="gameday, e.g. 2026-09-28")
+    ap.add_argument("--predict", nargs="+", metavar="WHEN",
+                    help="a gameday (2026-09-28) or a season and week (2026 4)")
     a = ap.parse_args()
 
     df = game_model.build(*game_model.load())
@@ -208,8 +209,12 @@ def main():
     if a.coefs:
         coefficients(df)
     if a.predict:
-        up = predict_slate(df, gameday=a.predict)
-        margin = game_model.predict_slate(df, gameday=a.predict)
+        if len(a.predict) == 2:
+            when = dict(season=int(a.predict[0]), week=int(a.predict[1]))
+        else:
+            when = dict(gameday=a.predict[0])
+        up = predict_slate(df, **when)
+        margin = game_model.predict_slate(df, **when)
         margin = dict(zip(margin.game_id, margin.pred_margin))
         print(f"{'game':14s} {'line':>6s} {'model':>6s} {'edge':>6s} "
               f"{'blend':>6s}  {'note':32s} implied score (blend total, "
