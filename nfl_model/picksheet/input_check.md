@@ -1,22 +1,26 @@
-# Input check — 2026 week 3
-_run 2026-09-23 22:18 PT_
+# Input check — 2026 week 4
+_run 2026-10-01 16:22 PT_
 
 ## Feed freshness
 
 - schedule + announced starters: 0h old
 - injury report: 0h old
-- injury burden the model uses: 269h old
+- injury burden the model uses: 0h old
 
-- injury report rows for week 3: **22**, of which **0** carry an Out/Doubtful/Questionable designation
-- **the model is pricing all 32 teams as fully healthy.** Designations are not published until Friday, so its three injury features are zero for every game on this slate.
+- injury report rows for week 4: **257**, of which **2** carry an Out/Doubtful/Questionable designation
+- teams carrying an injury burden in week 4: **1** (file built through week 4)
 
 ## Quarterbacks the model is assuming
 
 | Game | Team | Model assumes | Problem |
 |---|---|---|---|
-| ATL @ GB | ATL | **Michael Penix Jr.** | injury report says **knee**; did not start week 2 — C.Rush did |
-| MIN @ TB | MIN | **Kyler Murray** | did not start week 2 — C.Wentz did |
-| PHI @ CHI | CHI | **Case Keenum** | did not start week 2 — C.Williams did |
+| IND @ WAS | WAS | **Jayden Daniels** | injury report says **limited in practice, elbow**; did not start week 3 — M.Mariota did |
+| GB @ TB | TB | **Jalon Daniels** | did not start week 3 — B.Mayfield did; only 0 career dropbacks, so the model discounts his rating |
+| LAC @ SEA | SEA | **Drew Lock** | did not start week 3 — S.Darnold did |
+| TEN @ BAL | BAL | Lamar Jackson | injury report says **limited in practice, back** |
+| NE @ BUF | NE | Drake Maye | injury report says **shoulder** |
+| KC @ LV | KC | Patrick Mahomes | injury report says **knee** |
+| DET @ CAR | CAR | Bryce Young | injury report says **knee** |
 
 ## What the flags are worth
 
@@ -24,9 +28,9 @@ Each row re-runs the model with the most likely replacement (most career dropbac
 
 | Game | If instead | Model now | Model then | Line | Edge now | Edge then |
 |---|---|---|---:|---:|---:|---:|
-| ATL @ GB | Tua Tagovailoa (2568 career dropbacks) | +6.2 | +5.8 | +4.5 | -1.7 | -1.3 |
-| MIN @ TB | Carson Wentz (3806 career dropbacks) | -1.9 | -1.0 | -1.5 | +0.4 | -0.5 |
-| PHI @ CHI | Caleb Williams (1382 career dropbacks) | +1.9 | +2.8 | -4.5 | +6.4 | +7.3 |
+| IND @ WAS | Marcus Mariota (2223 career dropbacks) | +0.8 | +1.0 | -3.5 | +4.3 | +4.5 |
+| GB @ TB | Tom Brady (5190 career dropbacks) | -2.9 | -1.0 | -3.5 | +0.6 | +2.5 |
+| LAC @ SEA | Sam Darnold (3221 career dropbacks) | +9.7 | +10.3 | +7.0 | +2.7 | +3.3 |
 
 Margins are the home team's. Edges are signed for the team in the flagged column, so a shrinking edge means the model likes that side less.
 
