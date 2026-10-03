@@ -469,6 +469,24 @@ python3 fantasyguru_pull.py --dataset props --min-interval 600   # near lock
 python3 fantasyguru_pull.py --force                # deliberate override
 ```
 
+The fourth set, `articles`, is the week's written analysis from
+`/week-N-content-page-YYYY` (start/sit, injury report, cash and GPP breakdowns,
+Marlin's betting column, the position "coach" pieces) plus the game-script
+column from the front page, saved as one text file each under
+`~/fgdata/articles/<date>/`. The week defaults to the next unplayed slate;
+`--season/--week` override it.
+
+### `weekly_brief.py` — the Saturday bundle
+
+Runs the pulls in order (`fetch_data.sh`, `odds_snapshot.py`,
+`fantasyguru_pull.py`) and writes `~/fgdata/brief/<season>-w<week>.md`: the
+model's slate against the DraftKings snapshot with the same notes as the pick
+sheet, the input check, Fantasy Guru's rank for every player on the Yahoo
+roster (read from `~/memory/yahoo-fantasy-team.md`, `--roster` to point
+elsewhere), the largest SMASH line mismatches, and an index of the week's
+articles. A Saturday-morning Devin automation runs it and writes the summary
+from that file. `--no-pull` re-reads what is already on disk.
+
 Downloads go to `~/fgdata/<set>/<date>/` — outside the repo, because it is a
 paid feed and not ours to republish. The login session is cached in a persistent
 browser profile there too, so repeat runs do not re-authenticate.

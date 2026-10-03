@@ -26,6 +26,11 @@ Three sets are worth taking:
             testable. Nothing here goes near the model until enough weeks are
             stored to check it out of sample.
 
+  articles  /week-N-content-page-2026 — the week's written analysis (game
+            scripts, start/sit, injury report, cash and GPP breakdowns, the
+            betting column). Saved as plain text, one file per piece, so the
+            Saturday brief can quote them without a browser.
+
 The other stat pages under /data/nfl are Sportradar widgets with no export, so
 there is nothing to pull there.
 """
@@ -34,6 +39,7 @@ import csv
 import datetime
 import json
 import os
+import re
 import sys
 import time
 
@@ -59,6 +65,22 @@ SMASH = [
     "nfl-smash-report-matchups",      # per game: both lines and the advantage
     "nfl-smash-report-wr-coverage",   # per matchup: coverage type, advantage
 ]
+
+# Pieces worth keeping from the week's content page, matched on the link text
+# the page shows. Everything else there (IDP, CFB, livestream pages) is noise.
+ARTICLES = [
+    "Start/Sit", "Injury Report", "Cash Game Breakdown", "GPP Breakdown",
+    "Marlin", "Cliff", "Waiver Report", "Snap Counts", "Gameday Matchups",
+    "Staff Picks", "QB Coach", "RB Coach", "WR Coach", "TE Coach", "DST Coach",
+    "Scheming for Success", "Game Scripts",
+]
+LINKS_JS = """() => [...document.querySelectorAll('a')]
+    .map((a) => [a.innerText.replace(/\\s+/g, ' ').trim(), a.href])"""
+TEXT_JS = """() => {
+  const a = document.querySelector('article') || document.querySelector('main')
+      || document.body;
+  return a.innerText;
+}"""
 
 TABLE_JS = """() => {
   const t = document.querySelector('table');
@@ -187,11 +209,62 @@ def smash(page, day):
     return made
 
 
+def this_week():
+    """Season and week of the next unplayed slate, from the model's schedule."""
+    import game_model
+    games, _, _ = game_model.load()
+    return game_model.next_slate(games)
+
+
+def articles(page, day, season=None, week=None):
+    """The week's written pieces, as text files under articles/<day>/."""
+    if season is None or week is None:
+        season, week = this_week()
+    root = os.path.join(OUT, "articles", day)
+    os.makedirs(root, exist_ok=True)
+    page.goto(f"{HOME}/week-{week}-content-page-{season}",
+              wait_until="domcontentloaded")
+    page.wait_for_timeout(4000)
+    wanted = {}
+    for text, href in page.evaluate(LINKS_JS):
+        if "fantasyguru.com/" not in href or not text:
+            continue
+        slug = href.rstrip("/").split("/")[-1].lower()
+        # The content page links the previous week's recap under this week's
+        # heading; keep only pieces that name this week or none at all.
+        other = re.search(r"week-?(\d+)", slug)
+        if other and int(other.group(1)) != week:
+            continue
+        if any(k.lower() in text.lower() for k in ARTICLES):
+            wanted.setdefault(slug, href)
+    # The game-script column is posted to the front page, not the content page.
+    wanted.setdefault(f"projecting-week-{week}-game-scripts-{season}",
+                      f"{HOME}/projecting-week-{week}-game-scripts-{season}")
+    made = []
+    for slug, href in wanted.items():
+        page.goto(href, wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)
+        if "/account/login" in page.url or "404" in page.title():
+            made.append(f"{slug}: not available")
+            continue
+        text = page.evaluate(TEXT_JS)
+        path = os.path.join(root, re.sub(r"[^a-z0-9]+", "-", slug)[:80] + ".txt")
+        with open(path, "w") as fh:
+            fh.write(f"{page.title()}\n{href}\n\n{text}")
+        made.append(f"{path} ({len(text)} chars)")
+        time.sleep(1)
+    return made
+
+
 def main():
     global OUT
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dataset", default="props,rankings,smash",
-                    help="props, rankings, smash, or a comma-separated mix")
+    ap.add_argument("--dataset", default="props,rankings,smash,articles",
+                    help="props, rankings, smash, articles, or a "
+                         "comma-separated mix")
+    ap.add_argument("--season", type=int)
+    ap.add_argument("--week", type=int,
+                    help="for articles; default is the next unplayed slate")
     ap.add_argument("--min-interval", type=int, default=DAY,
                     help="seconds between pulls of the same set (default 1 day)")
     ap.add_argument("--force", action="store_true",
@@ -215,7 +288,9 @@ def main():
         return
 
     day = datetime.datetime.now(PACIFIC).strftime("%Y-%m-%d")
-    jobs = {"props": props, "rankings": rankings, "smash": smash}
+    jobs = {"props": props, "rankings": rankings, "smash": smash,
+            "articles": lambda page, day: articles(page, day, args.season,
+                                                   args.week)}
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             os.path.join(OUT, "browser"), headless=True,
