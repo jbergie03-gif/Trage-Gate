@@ -36,6 +36,8 @@ import html
 import os
 import re
 
+import site_chrome
+
 KEYS = ("model", "line", "pick", "fact", "unknown", "read", "caption")
 CAPTION_MAX = 2200
 # Case-insensitive: a shouted URL is the same dead text as a quiet one. The
@@ -84,10 +86,11 @@ PAGE = """<!DOCTYPE html>
   nav {{ max-width:680px; margin:0 auto 16px; font-size:13px; }}
   nav a {{ margin-right:14px; }}
 </style>
+<style id="chrome">{chrome_css}</style>
 </head>
 <body>
+{nav}
 <header><h1>{title}</h1><div class="sub">{sub}</div></header>
-<nav><a href="/week">This week's numbers</a><a href="/">Pick sheet</a></nav>
 <main>
 {games}
 </main>
@@ -174,7 +177,9 @@ def render(text):
     return PAGE.format(title=html.escape(head.get("title", "Scouting notes")),
                        sub=html.escape(head.get("sub", "")),
                        footer=html.escape(head.get("footer", "")),
-                       games="\n".join(blocks))
+                       games="\n".join(blocks),
+                       chrome_css=site_chrome.CSS,
+                       nav=site_chrome.nav("/notes"))
 
 
 def main():

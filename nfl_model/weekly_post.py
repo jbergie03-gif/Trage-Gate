@@ -23,6 +23,7 @@ import pandas as pd
 
 import game_model
 import market_flow
+import site_chrome
 import smash_feature
 
 try:
@@ -291,12 +292,12 @@ def render(season, week, rows, rec, now):
     o = ['<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width, initial-scale=1">',
          f"<title>NFL Week {week} — model vs the market</title>",
-         f"<style>{CSS}</style></head><body>",
+         f"<style>{CSS}</style><style id=\"chrome\">{site_chrome.CSS}</style></head><body>",
+         site_chrome.nav("/week"),
          f"<header><h1>Week {week} — model vs the market</h1>",
          f'<div class="sub">Posted {now:%A, %B %-d} at {now:%-I:%M %p} PT'
          " · every number below was public before kickoff</div></header>",
-         '<nav><a href="/notes">This week\'s scouting notes</a>'
-         '<a href="/">Pick sheet</a></nav><main>']
+         '<main>']
 
     if rec:
         cells = [("straight up", f"{rec['su']:.0%}"),

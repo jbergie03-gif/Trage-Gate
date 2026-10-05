@@ -19,6 +19,8 @@ import os
 import urllib.request
 import zoneinfo
 
+import site_chrome
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 ESPN = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
@@ -167,7 +169,8 @@ def build(season, cards_src):
         f"Jonathan leads by {grand['J'][3] - grand['D'][3]}" if grand["J"][3] > grand["D"][3]
         else f"Model leads by {grand['D'][3] - grand['J'][3]}")
     return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='color-scheme' content='dark'>"
-            f"<title>Standings — gridironmath</title><style>{CSS}</style></head><body>"
+            f"<title>Standings — gridironmath</title><style>{CSS}</style><style id=\"chrome\">{site_chrome.CSS}</style></head><body>"
+            + site_chrome.nav("/standings") +
             f"<h1>Jonathan vs the model — {season}</h1>"
             f"<p class='sub'>Against the spread, each pick graded on the line it was filed at. 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
             "<table><tr><th>Week</th><th class='n'>Jonathan</th><th class='n'>Pts</th><th class='n'>Model</th><th class='n'>Pts</th><th class='n'>Open</th></tr>"
@@ -176,7 +179,7 @@ def build(season, cards_src):
               f"<td class='n'>{rec(grand['D'])}</td><td class='n'>{grand['D'][3]}</td><td></td></tr></table>"
             "<p class='note'>The model's record is the product being measured, not an edge claim: it has trailed the closing line on margin error every week.</p>"
             + "".join(sections)
-            + "<p><a href='/'>This week's sheet</a> · <a href='/week'>This week's numbers</a></p></body></html>")
+            + "</body></html>")
 
 
 if __name__ == "__main__":

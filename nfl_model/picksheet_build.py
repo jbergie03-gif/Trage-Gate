@@ -25,6 +25,7 @@ import pandas as pd
 
 import game_model
 import input_check
+import site_chrome
 import smash_feature
 import total_model
 import weekly_post
@@ -191,7 +192,9 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
                      ("__SLATE__", slate),
                      ("__TAKEN__", stamp or "the schedule, no DK snapshot"),
                      ("__MAX_STARS__", str(doubles)),
-                     ("__GAMES__", json.dumps(games, indent=2))):
+                     ("__GAMES__", json.dumps(games, indent=2)),
+                     ("__CHROME_CSS__", site_chrome.CSS),
+                     ("__NAV__", site_chrome.nav("/"))):
         page = page.replace(key, val)
     with open(out, "w") as fh:
         fh.write(page)
