@@ -104,6 +104,11 @@ def post_line(away, home, score, spread_line, pred_margin,
     return '<div class="post">' + " \u00b7 ".join(bits) + "</div>"
 
 
+def gap_label(edge):
+    return ('<div class="gap"><span>Model vs market gap</span>'
+            f'<b>{abs(edge):.1f} pts</b></div>')
+
+
 def read(edge):
     """The sentence under each game. Sub-point edges are called coin flips
     explicitly rather than dressed up, because that is what they are against a
@@ -182,6 +187,9 @@ color:var(--dim);margin-bottom:3px}
 .post b{color:var(--text)}
 .post .W{color:var(--final)}.post .L{color:#f85149}.post .P{color:var(--warn)}
 @media(max-width:420px){.nums.scored{grid-template-columns:1fr 1fr}.num.final{grid-column:1/-1}}
+.gap{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.06em;
+text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.gap b{color:var(--model);font-variant-numeric:tabular-nums}
 .bar{height:4px;border-radius:3px;background:#20242e;overflow:hidden;margin-bottom:10px}
 .bar i{display:block;height:100%;background:var(--model)}
 .read{font-size:14px;color:var(--dim)}
@@ -380,6 +388,7 @@ def render(season, week, rows, rec, now, scores=None):
                  f'<div class="num model"><div class="k">My model</div>'
                  f'<div class="v">{team} −{by:.1f}</div></div>'
                  + (final_box(r["away"], r["home"], sc) if sc else "") + '</div>'
+                 + gap_label(edge) +
                  f'<div class="bar"><i style="width:{fill:.0f}%"></i></div>'
                  f'<div class="read">{html.escape(read(edge))}</div>')
         if sc:
@@ -505,7 +514,7 @@ GAME_RE = re.compile(
     r'<div class="num market"><div class="k">Market</div><div class="v">(?P<mkt>[^<]+)</div></div>'
     r'<div class="num model"><div class="k">My model</div><div class="v">(?P<mod>[^<]+)</div></div>'
     r'(?:<div class="num final">.*?</div></div>)?</div>'
-    r'(?P<bar><div class="bar">.*?</div>)<div class="read">(?P<read>[^<]*)</div>'
+    r'(?:<div class="gap">.*?</div>)?(?P<bar><div class="bar">.*?</div>)<div class="read">(?P<read>[^<]*)</div>'
     r'(?:<div class="post">.*?</div>)?', re.S)
 WHEN_RE = re.compile(r'<span>total (?P<tot>[^ <]+) · model (?P<ptot>[0-9.]+)</span></div>')
 
@@ -525,10 +534,11 @@ def patch_scores(path, season, week):
     scores = finals_or_empty(season, week)
     if '--final:' not in src:
         src = src.replace("--warn:#d9a20b}", "--warn:#d9a20b;--final:#3fb950}", 1)
-    if ".num.final" not in src:
-        extra = CSS[CSS.index(".nums.scored"):CSS.index("@media(max-width:420px)")]
-        extra += CSS[CSS.index("@media(max-width:420px)"):].split("\n", 1)[0] + "\n"
-        src = src.replace("</style>", extra + "</style>", 1)
+    for start, stop in ((".nums.scored", ".bar{"), (".gap{", ".bar{"),
+                        ("@media(max-width:420px)", "\n")):
+        if start not in src:
+            i = CSS.index(start)
+            src = src.replace("</style>", CSS[i:CSS.index(stop, i + 1)] + "\n</style>", 1)
     blocks = list(GAME_RE.finditer(src))
     out, pos, n = [], 0, 0
     for m in blocks:
@@ -547,6 +557,7 @@ def patch_scores(path, season, week):
                  f'<div class="num market"><div class="k">Market</div><div class="v">{m["mkt"]}</div></div>'
                  f'<div class="num model"><div class="k">My model</div><div class="v">{m["mod"]}</div></div>'
                  + (final_box(away, home, sc) if sc else "") + "</div>"
+                 + gap_label(pred - spread)
                  + m["bar"] + f'<div class="read">{m["read"]}</div>')
         if sc:
             piece += post_line(away, home, sc, spread, pred, tot, ptot)
