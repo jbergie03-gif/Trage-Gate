@@ -44,6 +44,8 @@ WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
 # beside the sheet rather than merged into it: the sheet is what the model
 # says, and these are the things it cannot read.
 NOTES = os.environ.get("NOTESPAGE", os.path.join(ROOT, "notes.html"))
+# Season standings, Jonathan vs the model, rendered by standings_build.py.
+STANDINGS = os.environ.get("STANDINGSPAGE", os.path.join(ROOT, "standings.html"))
 PORT = int(os.environ.get("PORT", "80"))
 # Behind Caddy on the droplet, so it binds loopback there and the certificate
 # terminates in front of it. Default stays public for running it bare.
@@ -270,6 +272,11 @@ class Handler(BaseHTTPRequestHandler):
                     "are already up.</p><p><a href='/week'>This week's "
                     "numbers</a></p>"), "text/html; charset=utf-8")
             with open(NOTES, "rb") as fh:
+                return self._send(200, fh.read(), "text/html; charset=utf-8")
+        if url.path in ("/standings", "/standings.html"):
+            if not os.path.exists(STANDINGS):
+                return self._send(404, {"error": "no standings page published"})
+            with open(STANDINGS, "rb") as fh:
                 return self._send(200, fh.read(), "text/html; charset=utf-8")
         if url.path == "/health":
             live = [r for r in subscriber_state().values()

@@ -1,0 +1,9 @@
+{
+  "4": {"source": "ESPN Pigskin Pick'em, ESPN lines, entered by hand 2026-10-05", "picks": [
+    ["PIT@CLE", "CLE +2.5", false], ["IND@WAS", "WAS +3.5", false], ["NE@BUF", "BUF -7.5", false],
+    ["NYJ@CHI", "CHI -3.5", false], ["JAX@CIN", "JAX +2.5", false], ["ARI@NYG", "NYG +1.5", false],
+    ["LA@PHI", "LA -2.5", false], ["GB@TB", "GB -3.5", false], ["TEN@BAL", "BAL -11.5", false],
+    ["DAL@HOU", "DAL +2.5", false], ["MIA@MIN", "MIA +11.5", false], ["KC@LV", "LV +4.5", false],
+    ["LAC@SEA", "SEA -6.5", false], ["DEN@SF", "SF -2.5", false], ["DET@CAR", "DET -3.5", false],
+    ["ATL@NO", "NO -2.5", true]]}
+}
