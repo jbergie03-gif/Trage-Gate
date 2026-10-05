@@ -15,6 +15,7 @@ import argparse
 import datetime
 import html
 import os
+import re
 import shutil
 import subprocess
 import zoneinfo
@@ -25,6 +26,7 @@ import game_model
 import market_flow
 import site_chrome
 import smash_feature
+import standings_build
 
 try:
     from PIL import Image
@@ -32,6 +34,7 @@ except ImportError:            # the page still generates without the image
     Image = None
 
 GAMES = game_model.GAMES
+ABBR = {}  # team name -> abbreviation, filled after TEAMS
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 ET = zoneinfo.ZoneInfo("America/New_York")
 OUT = os.path.expanduser("~/nflmodel/out/week.html")
@@ -46,6 +49,7 @@ TEAMS = {
     "NYJ": "Jets", "PHI": "Eagles", "PIT": "Steelers", "SEA": "Seahawks",
     "SF": "49ers", "TB": "Buccaneers", "TEN": "Titans", "WAS": "Commanders",
 }
+ABBR.update({v: k for k, v in TEAMS.items()})
 
 
 def kickoff(row):
@@ -62,6 +66,47 @@ def kickoff(row):
 def side(margin, home, away):
     """Which team a home-margin number favors, and by how much."""
     return (home, margin) if margin > 0 else (away, -margin)
+
+
+def final_box(away, home, score):
+    a, h = score
+    team, by = side(h - a, home, away) if h != a else (None, 0)
+    v = f"{team} by {by:.0f}" if team else "Tie"
+    return ('<div class="num final"><div class="k">Final</div>'
+            f'<div class="v">{v}</div>'
+            f'<div class="s">{away} {a} \u2013 {home} {h}</div></div>')
+
+
+def post_line(away, home, score, spread_line, pred_margin,
+              total_line=None, pred_total=None):
+    """How far each number landed from the result, and whether the model's
+    side of the line cashed. Nothing here is a bet; it is the scorecard."""
+    a, h = score
+    res = h - a
+    m_miss = abs(pred_margin - res)
+    k_miss = abs(spread_line - res)
+    closer = ("model" if m_miss < k_miss - 1e-9 else
+              "market" if k_miss < m_miss - 1e-9 else "tie")
+    adj = (pred_margin - spread_line) * (res - spread_line)
+    if abs(pred_margin - spread_line) < 1e-9:
+        ats, cls = "model had no side", "P"
+    elif res == spread_line:
+        ats, cls = "push on the line", "P"
+    elif adj > 0:
+        ats, cls = "model side covered", "W"
+    else:
+        ats, cls = "model side lost", "L"
+    bits = [f"Model missed by <b>{m_miss:.1f}</b>, market by <b>{k_miss:.1f}</b>"
+            + (f" \u2014 {closer} closer" if closer != "tie" else " \u2014 even"),
+            f'<span class="{cls}">{ats}</span>']
+    if total_line is not None and pred_total is not None and not pd.isna(total_line):
+        bits.append(f"{a + h} points vs total {total_line:.1f} / model {pred_total:.1f}")
+    return '<div class="post">' + " \u00b7 ".join(bits) + "</div>"
+
+
+def gap_label(edge):
+    return ('<div class="gap"><span>Model vs market gap</span>'
+            f'<b>{abs(edge):.1f} pts</b></div>')
 
 
 def read(edge):
@@ -105,7 +150,7 @@ def last_week(df, season, week):
 
 CSS = """
 :root{--bg:#0f1115;--card:#181b22;--line:#262b36;--text:#e8eaed;
---dim:#9aa0ac;--model:#a371f7;--market:#58a6ff;--warn:#d9a20b}
+--dim:#9aa0ac;--model:#a371f7;--market:#58a6ff;--warn:#d9a20b;--final:#3fb950}
 *{box-sizing:border-box}
 body{margin:0;padding:20px 12px 80px;background:var(--bg);color:var(--text);
 font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -135,6 +180,16 @@ color:var(--dim);margin-bottom:3px}
 .num .v{font-size:17px;font-variant-numeric:tabular-nums;font-weight:600}
 .num.market .v{color:var(--market)}
 .num.model .v{color:var(--model)}
+.nums.scored{grid-template-columns:1fr 1fr 1fr}
+.num.final .v{color:var(--final)}
+.num .s{font-size:12px;color:var(--dim);margin-top:2px}
+.post{font-size:13px;color:var(--dim);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.post b{color:var(--text)}
+.post .W{color:var(--final)}.post .L{color:#f85149}.post .P{color:var(--warn)}
+@media(max-width:420px){.nums.scored{grid-template-columns:1fr 1fr}.num.final{grid-column:1/-1}}
+.gap{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.06em;
+text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.gap b{color:var(--model);font-variant-numeric:tabular-nums}
 .bar{height:4px;border-radius:3px;background:#20242e;overflow:hidden;margin-bottom:10px}
 .bar i{display:block;height:100%;background:var(--model)}
 .read{font-size:14px;color:var(--dim)}
@@ -288,7 +343,8 @@ def post_render(season, week, rows, rec, now):
     return "\n".join(o)
 
 
-def render(season, week, rows, rec, now):
+def render(season, week, rows, rec, now, scores=None):
+    scores = scores or {}
     o = ['<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width, initial-scale=1">',
          f"<title>NFL Week {week} — model vs the market</title>",
@@ -320,18 +376,24 @@ def render(season, week, rows, rec, now):
         edge = r["pred_margin"] - r["spread_line"]
         fill = min(abs(edge) / 7 * 100, 100)
         tot = ("—" if pd.isna(r["total_line"]) else f"{r['total_line']:.1f}")
+        sc = scores.get(f"{r['away']}@{r['home']}")
         o.append('<div class="game">'
                  f'<div class="when"><span>{r["kick"]:%a %-I:%M %p} PT</span>'
                  f'<span>total {tot} · model {r["pred_total"]:.1f}</span></div>'
                  f'<div class="matchup">{html.escape(TEAMS[r["away"]])}'
                  f'<span class="at">at</span>{html.escape(TEAMS[r["home"]])}</div>'
-                 '<div class="nums">'
+                 f'<div class="nums{" scored" if sc else ""}">'
                  f'<div class="num market"><div class="k">Market</div>'
                  f'<div class="v">{mteam} −{mby:.1f}</div></div>'
                  f'<div class="num model"><div class="k">My model</div>'
-                 f'<div class="v">{team} −{by:.1f}</div></div></div>'
+                 f'<div class="v">{team} −{by:.1f}</div></div>'
+                 + (final_box(r["away"], r["home"], sc) if sc else "") + '</div>'
+                 + gap_label(edge) +
                  f'<div class="bar"><i style="width:{fill:.0f}%"></i></div>'
                  f'<div class="read">{html.escape(read(edge))}</div>')
+        if sc:
+            o.append(post_line(r["away"], r["home"], sc, r["spread_line"],
+                               r["pred_margin"], r["total_line"], r["pred_total"]))
         if r["note"]:
             o.append(f'<div class="note">{html.escape(r["note"])}</div>')
         o.append("</div>")
@@ -424,9 +486,9 @@ def build(season=None, week=None, out=OUT, image=True):
 
     rec = last_week(df, season, week)
     now = datetime.datetime.now(PACIFIC)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as fh:
-        fh.write(render(season, week, rows, rec, now))
+        fh.write(render(season, week, rows, rec, now, finals_or_empty(season, week)))
     print(f"wrote {out}: {len(rows)} games")
     if image:
         shot = os.path.splitext(out)[0] + "_post.html"
@@ -438,6 +500,75 @@ def build(season=None, week=None, out=OUT, image=True):
     return out
 
 
+def finals_or_empty(season, week):
+    try:
+        return standings_build.finals(season, week)
+    except (OSError, KeyError, ValueError) as e:
+        print(f"finals unavailable: {e}")
+        return {}
+
+
+GAME_RE = re.compile(
+    r'<div class="matchup">(?P<away>[^<]+)<span class="at">at</span>(?P<home>[^<]+)</div>'
+    r'<div class="nums(?: scored)?">'
+    r'<div class="num market"><div class="k">Market</div><div class="v">(?P<mkt>[^<]+)</div></div>'
+    r'<div class="num model"><div class="k">My model</div><div class="v">(?P<mod>[^<]+)</div></div>'
+    r'(?:<div class="num final">.*?</div></div>)?</div>'
+    r'(?:<div class="gap">.*?</div>)?(?P<bar><div class="bar">.*?</div>)<div class="read">(?P<read>[^<]*)</div>'
+    r'(?:<div class="post">.*?</div>)?', re.S)
+WHEN_RE = re.compile(r'<span>total (?P<tot>[^ <]+) · model (?P<ptot>[0-9.]+)</span></div>')
+
+
+def _home_margin(text, home, away):
+    """'PIT −2.5' -> expected home margin."""
+    team, num = html.unescape(text).replace("\u2212", "-").split()
+    num = abs(float(num))
+    return num if team == home else -num
+
+
+def patch_scores(path, season, week):
+    """Add finals to an already-published week page without touching the
+    pre-kickoff numbers it carries (rebuilding would re-pull lines)."""
+    with open(path) as fh:
+        src = fh.read()
+    scores = finals_or_empty(season, week)
+    if '--final:' not in src:
+        src = src.replace("--warn:#d9a20b}", "--warn:#d9a20b;--final:#3fb950}", 1)
+    for start, stop in ((".nums.scored", ".bar{"), (".gap{", ".bar{"),
+                        ("@media(max-width:420px)", "\n")):
+        if start not in src:
+            i = CSS.index(start)
+            src = src.replace("</style>", CSS[i:CSS.index(stop, i + 1)] + "\n</style>", 1)
+    blocks = list(GAME_RE.finditer(src))
+    out, pos, n = [], 0, 0
+    for m in blocks:
+        away, home = ABBR[html.unescape(m["away"])], ABBR[html.unescape(m["home"])]
+        sc = scores.get(f"{away}@{home}")
+        out.append(src[pos:m.start()])
+        pos = m.end()
+        head = src[max(0, m.start() - 300):m.start()]
+        w = WHEN_RE.search(head)
+        tot = (None if not w or w["tot"] == "—" else float(w["tot"]))
+        ptot = float(w["ptot"]) if w else None
+        spread = _home_margin(m["mkt"], home, away)
+        pred = _home_margin(m["mod"], home, away)
+        piece = (f'<div class="matchup">{m["away"]}<span class="at">at</span>{m["home"]}</div>'
+                 f'<div class="nums{" scored" if sc else ""}">'
+                 f'<div class="num market"><div class="k">Market</div><div class="v">{m["mkt"]}</div></div>'
+                 f'<div class="num model"><div class="k">My model</div><div class="v">{m["mod"]}</div></div>'
+                 + (final_box(away, home, sc) if sc else "") + "</div>"
+                 + gap_label(pred - spread)
+                 + m["bar"] + f'<div class="read">{m["read"]}</div>')
+        if sc:
+            piece += post_line(away, home, sc, spread, pred, tot, ptot)
+            n += 1
+        out.append(piece)
+    out.append(src[pos:])
+    with open(path, "w") as fh:
+        fh.write("".join(out))
+    print(f"patched {path}: {n} of {len(blocks)} games final")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=OUT)
@@ -445,5 +576,12 @@ if __name__ == "__main__":
     ap.add_argument("--week", type=int)
     ap.add_argument("--no-image", action="store_true",
                     help="skip the Instagram screenshot")
+    ap.add_argument("--patch-scores", metavar="FILE",
+                    help="add finals to a published page (needs --season/--week)")
     a = ap.parse_args()
-    build(a.season, a.week, a.out, image=not a.no_image)
+    if a.patch_scores:
+        if a.season is None or a.week is None:
+            ap.error("--patch-scores needs --season and --week")
+        patch_scores(a.patch_scores, a.season, a.week)
+    else:
+        build(a.season, a.week, a.out, image=not a.no_image)
