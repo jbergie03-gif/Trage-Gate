@@ -78,17 +78,24 @@ def grade(game, side, score):
 
 
 def jonathan_cards(src, season, devin):
-    """Latest card per slate from the API, mapped to week by the model's slate list."""
+    """Jonathan's picks per slate from the API, mapped to week by the model's slate list.
+
+    Revisions are merged game by game in submission order: a later card only
+    carries the games still open, so its picks override but never erase an
+    earlier pick on a locked game."""
     by_slate = {}
     for r in fetch_json(src)["cards"]:
-        if r["who"] == "jonathan":
-            by_slate[r["slate"]] = r
+        if r["who"] != "jonathan":
+            continue
+        picks = by_slate.setdefault(r["slate"], {})
+        for p in r["picks"]:
+            if p.get("side"):
+                picks[p["game"]] = [p["game"], p["side"], bool(p.get("double"))]
     cards = {}
     for week, d in devin.items():
         for s in d["slates"]:
             if s in by_slate:
-                cards[week] = [[p["game"], p["side"], p["double"]]
-                               for p in by_slate[s]["picks"]]
+                cards[week] = list(by_slate[s].values())
     path = os.path.join(HERE, "records", f"jonathan_cards_{season}.json")
     if os.path.exists(path):
         for week, d in fetch_json(path).items():
@@ -102,7 +109,7 @@ def week_table(week, games, dcard, jcard, scores):
     rows, tot = [], {"D": [0, 0, 0, 0], "J": [0, 0, 0, 0]}  # W L P pts
     for g in games:
         sc = scores.get(g)
-        cells = [g, f"{sc[0]}-{sc[1]}" if sc else "—"]
+        cells = [html.escape(g), f"{sc[0]}-{sc[1]}" if sc else "—"]
         for who, card in (("J", j), ("D", d)):
             if g not in card:
                 cells += ["", ""]
@@ -178,7 +185,7 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=os.path.expanduser("~/nflmodel/out/standings.html"))
     ap.add_argument("--cards", default=CARDS_URL)
     a = ap.parse_args()
-    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w") as fh:
         fh.write(build(a.season, a.cards))
     print(a.out)
