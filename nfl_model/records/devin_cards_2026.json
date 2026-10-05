@@ -1,0 +1,29 @@
+{
+  "1": {"slates": ["2026-09-13"], "picks": [
+    ["ATL@PIT", "PIT -6.0", false], ["BAL@IND", "IND +3.5", false], ["BUF@HOU", "HOU +1.5", false],
+    ["CHI@CAR", "CAR +3.0", false], ["TB@CIN", "TB +3.5", false], ["CLE@JAX", "CLE +8.5", false],
+    ["NO@DET", "DET -7.0", false], ["NYJ@TEN", "TEN -1.5", false], ["ARI@LAC", "ARI +9.5", true],
+    ["GB@MIN", "GB +2.5", false], ["MIA@LV", "MIA +3.0", true], ["WAS@PHI", "PHI -6.0", false],
+    ["DAL@NYG", "NYG +3.0", false]]},
+  "2": {"slates": ["2026-w02"], "picks": [
+    ["DET@BUF", "BUF -4.5", false], ["CAR@ATL", "ATL +2.5", true], ["NO@BAL", "NO +7.5", false],
+    ["MIN@CHI", "MIN +4.5", false], ["CIN@HOU", "HOU -3.0", false], ["PIT@NE", "NE -5.5", false],
+    ["GB@NYJ", "GB -3.5", false], ["CLE@TB", "CLE +8.5", false], ["PHI@TEN", "TEN +7.0", false],
+    ["JAX@DEN", "JAX +2.5", true], ["LV@LAC", "LV +6.5", false], ["SEA@ARI", "SEA -3.5", false],
+    ["WAS@DAL", "WAS +4.5", false], ["MIA@SF", "MIA +13.5", false], ["IND@KC", "IND +6.5", false],
+    ["NYG@LA", "NYG +7.0", false]]},
+  "3": {"slates": ["2026-w03"], "picks": [
+    ["ATL@GB", "GB -4.5", false], ["LAC@BUF", "BUF -7.0", true], ["CAR@CLE", "CAR -2.5", false],
+    ["NYJ@DET", "DET -6.5", false], ["HOU@IND", "IND +2.5", false], ["NE@JAX", "NE +3.0", false],
+    ["KC@MIA", "MIA +10.5", false], ["TEN@NYG", "NYG -2.5", false], ["CIN@PIT", "PIT +3.5", false],
+    ["SEA@WAS", "WAS +7.0", false], ["ARI@SF", "SF -8.5", false], ["MIN@TB", "MIN -1.5", false],
+    ["BAL@DAL", "DAL +3.5", false], ["LV@NO", "NO -3.0", false], ["LA@DEN", "DEN +2.5", false],
+    ["PHI@CHI", "CHI +4.5", true]]},
+  "4": {"slates": ["2026-w04"], "picks": [
+    ["PIT@CLE", "CLE +2.5", false], ["IND@WAS", "WAS +3.5", false], ["TEN@BAL", "TEN +11.5", false],
+    ["NE@BUF", "NE +7.0", false], ["NYJ@CHI", "CHI -3.5", true], ["JAX@CIN", "JAX +2.5", true],
+    ["DAL@HOU", "HOU -3.0", false], ["ARI@NYG", "NYG +2.5", false], ["LA@PHI", "LA -3.5", false],
+    ["GB@TB", "TB +3.5", false], ["MIA@MIN", "MIA +10.5", false], ["KC@LV", "KC -4.5", false],
+    ["LAC@SEA", "SEA -7.0", false], ["DEN@SF", "SF -3.0", false], ["DET@CAR", "CAR +3.5", false],
+    ["ATL@NO", "ATL +2.5", false]]}
+}

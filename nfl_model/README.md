@@ -665,6 +665,20 @@ from the top of the week page. Missing notes answer with a page pointing back
 at the numbers rather than with a 404 body, since a reader can arrive from that
 link before the week's notes exist.
 
+### `standings_build.py` — Jonathan vs the model, week by week
+
+```
+python3 standings_build.py                   # writes ~/nflmodel/out/standings.html
+scp ~/nflmodel/out/standings.html root@138.197.14.49:/opt/nfl-cards/
+```
+
+The model's cards are filed in `records/devin_cards_<season>.json` (the sheet
+as published, doubles marked). Jonathan's come from the card API (`/cards`),
+with `records/jonathan_cards_<season>.json` for weeks he picked elsewhere.
+Finals come from the ESPN scoreboard; each pick is graded on the line it was
+filed at, so the two cards can carry different numbers on the same game.
+One point per cover, two for a double, pushes void. Served at `/standings`.
+
 ## 12. Offensive line: rating one lineman fails, counting absent starters works
 
 The model docks a team the same amount for any missing non-quarterback, so a
