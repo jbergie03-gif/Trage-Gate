@@ -19,7 +19,7 @@ CSS = """
 :root{--bg:#0f1115;--card:#181b22;--line:#262b36;--text:#e8eaed;--dim:#9aa0ac;
 --turf:#2fa84f;--turf-dark:#1b5e2d;--chalk:#f4f1ea;--model:#a371f7;--market:#58a6ff}
 html{color-scheme:dark}
-body{background:var(--bg);color:var(--text)}
+body{background:var(--bg);color:var(--text);overflow-x:clip}
 nav.site{display:block;max-width:none;width:auto;font-size:16px;position:sticky;top:0;z-index:50;margin:-20px calc(50% - 50vw) 18px;padding:0 16px;
 background:linear-gradient(180deg,#131a16 0%,#0f1115 100%);
 border-bottom:2px solid var(--turf-dark);box-shadow:0 1px 0 #1b5e2d33,0 6px 18px #0008}
