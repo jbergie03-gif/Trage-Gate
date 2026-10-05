@@ -27,18 +27,18 @@ CARDS_URL = "https://gridironmath.com/cards"
 ALIAS = {"WSH": "WAS", "LAR": "LA"}
 
 CSS = """
-body{font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:860px;margin:0 auto;padding:20px;color:#111}
+body{font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:860px;margin:0 auto;padding:20px;background:#121212;color:#e6e6e6}
 h1{margin:0 0 4px}h2{margin:28px 0 8px;font-size:20px}
-.sub{color:#555;margin-bottom:18px}
+.sub{color:#a8a8a8;margin-bottom:18px}
 table{border-collapse:collapse;width:100%;margin-bottom:8px}
-th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #e3e3e3;white-space:nowrap}
-th{font-size:13px;color:#555;text-transform:uppercase;letter-spacing:.03em}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #2c2c2c;white-space:nowrap}
+th{font-size:13px;color:#a8a8a8;text-transform:uppercase;letter-spacing:.03em}
 td.n,th.n{text-align:right}
-.W{color:#157a2a;font-weight:600}.L{color:#b3261e;font-weight:600}.P{color:#777}
+.W{color:#4cd964;font-weight:600}.L{color:#ff6b60;font-weight:600}.P{color:#8a8a8a}
 .dbl{font-weight:700}
-.total td{font-weight:700;border-top:2px solid #111}
-.note{color:#555;font-size:14px}
-a{color:#0b57d0}
+.total td{font-weight:700;border-top:2px solid #e6e6e6}
+.note{color:#a8a8a8;font-size:14px}
+a{color:#7ab8ff}
 """
 
 
@@ -159,7 +159,7 @@ def build(season, cards_src):
     lead = "tied" if grand["J"][3] == grand["D"][3] else (
         f"Jonathan leads by {grand['J'][3] - grand['D'][3]}" if grand["J"][3] > grand["D"][3]
         else f"Model leads by {grand['D'][3] - grand['J'][3]}")
-    return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+    return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='color-scheme' content='dark'>"
             f"<title>Standings — gridironmath</title><style>{CSS}</style></head><body>"
             f"<h1>Jonathan vs the model — {season}</h1>"
             f"<p class='sub'>Against the spread, each pick graded on the line it was filed at. 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
