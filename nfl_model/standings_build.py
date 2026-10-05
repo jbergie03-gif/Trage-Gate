@@ -172,7 +172,7 @@ def build(season, cards_src):
             f"<title>Standings — gridironmath</title><style>{CSS}</style><style id=\"chrome\">{site_chrome.CSS}</style></head><body>"
             + site_chrome.nav("/standings") +
             f"<h1>Jonathan vs the model — {season}</h1>"
-            f"<p class='sub'>Against the spread, each pick graded on the line it was filed at. 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
+            f"<p class='sub'>Against the spread, each pick graded on the line it was filed at (the DraftKings spread on the sheet when the card was saved). 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
             "<table><tr><th>Week</th><th class='n'>Jonathan</th><th class='n'>Pts</th><th class='n'>Model</th><th class='n'>Pts</th><th class='n'>Open</th></tr>"
             + "".join(season_rows)
             + f"<tr class='total'><td>Season</td><td class='n'>{rec(grand['J'])}</td><td class='n'>{grand['J'][3]}</td>"

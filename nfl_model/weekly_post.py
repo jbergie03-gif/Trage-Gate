@@ -104,6 +104,11 @@ def post_line(away, home, score, spread_line, pred_margin,
     return '<div class="post">' + " \u00b7 ".join(bits) + "</div>"
 
 
+SOURCE_NOTE = (" · <b>Market</b> = the posted point spread from the nflverse schedule"
+               " feed (games.csv, a consensus Vegas number) at posting time;"
+               " the pick sheet uses DraftKings")
+
+
 def gap_label(edge):
     return ('<div class="gap"><span>Model vs market gap</span>'
             f'<b>{abs(edge):.1f} pts</b></div>')
@@ -352,7 +357,7 @@ def render(season, week, rows, rec, now, scores=None):
          site_chrome.nav("/week"),
          f"<header><h1>Week {week} — model vs the market</h1>",
          f'<div class="sub">Posted {now:%A, %B %-d} at {now:%-I:%M %p} PT'
-         " · every number below was public before kickoff</div></header>",
+         " · every number below was public before kickoff" + SOURCE_NOTE + "</div></header>",
          '<main>']
 
     if rec:
@@ -528,9 +533,13 @@ def _home_margin(text, home, away):
 
 def patch_scores(path, season, week):
     """Add finals to an already-published week page without touching the
-    pre-kickoff numbers it carries (rebuilding would re-pull lines)."""
+    pre-kickoff numbers it carries (rebuilding would re-pull lines). Also
+    stamps the market-source note into the header if it is missing."""
     with open(path) as fh:
         src = fh.read()
+    if "<b>Market</b> =" not in src:
+        src = src.replace("public before kickoff</div></header>",
+                          "public before kickoff" + SOURCE_NOTE + "</div></header>", 1)
     scores = finals_or_empty(season, week)
     if '--final:' not in src:
         src = src.replace("--warn:#d9a20b}", "--warn:#d9a20b;--final:#3fb950}", 1)
