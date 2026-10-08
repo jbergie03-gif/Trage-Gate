@@ -451,7 +451,6 @@ def render(season, week, rows, rec, now, scores=None):
 
     o.append(SIGNUP)
 
-    smash = max((abs(r.get("smash") or 0) for r in rows), default=0)
     o.append("</main><footer><b>How to read this.</b> Both numbers are the "
              "expected home margin. Mine comes from a ridge model on "
              "opponent-adjusted efficiency, quarterback value, the injury "
@@ -460,15 +459,14 @@ def render(season, week, rows, rec, now, scores=None):
              "nothing is added to it by hand, and the two double-weight games "
              "are the two largest disagreements with the market, not a hunch."
              "<br><br>"
-             + ("<b>One thing is measured here but deliberately not used.</b> "
-                "Fantasy Guru's offensive-line matchup rating would move each "
-                "game's number by up to 1.5 points. Their pages keep no "
-                "history, so that size could only be assumed rather than fit, "
-                "and its first two scored weeks changed the published side of "
-                "four games and lost all four. The numbers above are the "
-                "model alone; the rating is still recorded every week so it "
-                "can be scored honestly later.<br><br>"
-                if smash > 0.01 else "")
+             + "<b>One thing is measured here but deliberately not used.</b> "
+               "Fantasy Guru's offensive-line matchup rating would move each "
+               "game's number by up to 1.5 points. Their pages keep no "
+               "history, so that size could only be assumed rather than fit, "
+               "and its first two scored weeks changed the published side of "
+               "four games and lost all four. It is recorded every week so it "
+               "can be scored honestly later, and it never moves the number "
+               "published above.<br><br>"
              + "<b>Out of sample it does not beat the closing line:</b> 10.23 "
              "points of average error against the market's 9.82 over 1,962 "
              "games, and 48.3% against the spread. That is published here for "
