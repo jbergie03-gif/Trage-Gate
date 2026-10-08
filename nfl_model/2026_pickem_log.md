@@ -553,7 +553,7 @@ Standing caveat: 20-23 against the spread over three weeks, and the model's
 margin error is behind the closing line in all three. The record is the
 product, not an edge claim.
 
-## 2026 Week 4 — logged 2026-10-01 16:22 PT
+## 2026 Week 5 — logged 2026-10-08 15:58 PT
 
 Model is the walk-forward ridge in `nfl_model/game_model.py`. Out of
 sample it measured **worse** than the closing line on both markets
@@ -563,21 +563,20 @@ expected home margin, so positive means the home team is favored.
 
 | Game | Spread | Model | Δ | Total | Model total | Δ | Market note |
 |---|---|---|---|---|---|---|---|
-| PIT @ CLE | -2.5 | -1.1 | +1.4 | 38.5 | 45.9 | +7.4 |  |
-| IND @ WAS | -3.5 | +0.8 | +4.3 | 48.5 | 40.4 | -8.1 |  |
-| TEN @ BAL | +11.5 | +11.1 | -0.4 | 42.5 | 44.7 | +2.2 |  |
-| NE @ BUF | +7.0 | +4.8 | -2.2 | 48.5 | 45.8 | -2.7 | 71% of tickets on BUF -- crowds this lopsided covered 47.1% (n=204) |
-| NYJ @ CHI | +3.5 | +8.1 | +4.6 | 43.5 | 45.7 | +2.2 |  |
-| JAX @ CIN | +2.5 | -2.0 | -4.5 | 51.5 | 46.9 | -4.6 | 65% of tickets on the over -- the over hit 46.0% (n=113) in that bucket |
-| DAL @ HOU | +3.0 | +4.2 | +1.2 | 48.5 | 47.7 | -0.8 | line moved 1.0 toward HOU since the opener -- movement alone covered 53.4% (n=788), inside the noise |
-| ARI @ NYG | -2.5 | +1.1 | +3.6 | 44.5 | 47.8 | +3.3 | line moved 4.2 toward ARI since the opener -- movement alone covered 53.4% (n=788), inside the noise |
-| LA @ PHI | -3.5 | -3.8 | -0.3 | 42.5 | 47.4 | +4.9 | line moved 1.0 toward LA since the opener -- movement alone covered 53.4% (n=788), inside the noise |
-| GB @ TB | -3.5 | -2.9 | +0.6 | 38.5 | 43.2 | +4.7 | line moved 2.8 toward GB since the opener -- movement alone covered 53.4% (n=788), inside the noise |
-| MIA @ MIN | +10.5 | +9.1 | -1.4 | 38.5 | 46.7 | +8.2 |  |
-| KC @ LV | -4.5 | -5.2 | -0.7 | 47.5 | 47.5 | -0.0 | 70% of tickets on the over -- the over hit 46.0% (n=113) in that bucket |
-| LAC @ SEA | +7.0 | +9.7 | +2.7 | 42.5 | 46.4 | +3.9 | line moved 1.0 toward SEA since the opener -- movement alone covered 53.4% (n=788), inside the noise |
-| DEN @ SF | +3.0 | +5.1 | +2.1 | 47.5 | 48.2 | +0.7 | reverse line movement: 70% of tickets on SF, but the number moved 0.5 toward DEN. Backing the move covered 57.9% (n=159) -- though 51% in the season with the most games, so it is a flag, not a bet |
-| DET @ CAR | -3.5 | -1.9 | +1.6 | 50.5 | 46.3 | -4.2 | 69% of tickets on the over -- the over hit 46.0% (n=113) in that bucket |
-| ATL @ NO | +2.5 | +0.9 | -1.6 | 47.5 | 45.5 | -2.0 |  |
+| TB @ DAL | +9.5 | +5.4 | -4.1 | 48.5 | 46.4 | -2.1 | line moved 1.0 toward TB since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| PHI @ JAX | +7.5 | +8.5 | +1.0 | 41.5 | 39.6 | -1.9 | line moved 4.2 toward JAX since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| CHI @ GB | -2.5 | +3.7 | +6.2 | 45.5 | 45.3 | -0.2 |  |
+| CIN @ MIA | -6.5 | -4.3 | +2.2 | 42.5 | 46.5 | +4.0 | reverse line movement: 72% of tickets on CIN, but the number moved 1.0 toward MIA. Backing the move covered 57.9% (n=159) -- though 51% in the season with the most games, so it is a flag, not a bet |
+| LV @ NE | +3.5 | +8.4 | +4.9 | 45.5 | 47.5 | +2.0 |  |
+| MIN @ NO | -2.5 | -2.7 | -0.2 | 41.5 | 47.2 | +5.7 | line moved 1.0 toward MIN since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| CLE @ NYJ | +2.5 | +0.2 | -2.3 | 39.5 | 46.1 | +6.6 | line moved 1.0 toward NYJ since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| IND @ PIT | +2.5 | +1.7 | -0.8 | 44.5 | 46.5 | +2.0 |  |
+| HOU @ TEN | -7.5 | -5.7 | +1.8 | 37.5 | 44.8 | +7.3 | line moved 1.0 toward HOU since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| NYG @ WAS | +3.5 | +3.6 | +0.1 | 41.5 | 44.0 | +2.5 | reverse line movement: 61% of tickets on NYG, but the number moved 1.0 toward WAS. Backing the move covered 57.9% (n=159) -- though 51% in the season with the most games, so it is a flag, not a bet |
+| DEN @ LAC | -3.5 | -1.7 | +1.8 | 41.5 | 47.3 | +5.8 |  |
+| DET @ ARI | -5.5 | -3.9 | +1.6 | 54.5 | 47.6 | -6.9 | 75% of tickets on the over -- the over hit 46.0% (n=113) in that bucket |
+| SF @ SEA | +3.0 | +0.5 | -2.5 | 45.5 | 45.8 | +0.3 |  |
+| BAL @ ATL | +3.0 | +0.3 | -2.7 | 43.5 | 42.7 | -0.8 | line moved 7.2 toward ATL since the opener -- movement alone covered 53.4% (n=788), inside the noise |
+| BUF @ LA | +3.0 | +3.6 | +0.6 | 54.5 | 47.8 | -6.7 | line moved 1.0 toward LA since the opener -- movement alone covered 53.4% (n=788), inside the noise |
 
 Player-level entries are deliberately absent: projections are not logged until inactives and depth charts are verified for every player named.
