@@ -14,6 +14,7 @@ Run: python3 weekly_post.py [--out path] [--season S --week W] [--no-image]
 import argparse
 import datetime
 import html
+import json
 import os
 import re
 import shutil
@@ -38,6 +39,8 @@ ABBR = {}  # team name -> abbreviation, filled after TEAMS
 PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 ET = zoneinfo.ZoneInfo("America/New_York")
 OUT = os.path.expanduser("~/nflmodel/out/week.html")
+SHEET = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "picksheet", "index.html")
 
 TEAMS = {
     "ARI": "Cardinals", "ATL": "Falcons", "BAL": "Ravens", "BUF": "Bills",
@@ -107,6 +110,33 @@ def post_line(away, home, score, spread_line, pred_margin,
 SOURCE_NOTE = (" · <b>Market</b> = the posted point spread from the nflverse schedule"
                " feed (games.csv, a consensus Vegas number) at posting time;"
                " the pick sheet uses DraftKings")
+
+
+def sheet_doubles(season, week, path=SHEET):
+    """The double-weight games, read off the built sheet rather than recomputed.
+
+    Both pages have to name the same two games, and they cannot agree by each
+    applying the rule: the sheet ranks disagreements against the DraftKings
+    snapshot and skips games already kicked off, while this page prices the
+    market off the schedule file. Reading the sheet keeps it the one place the
+    doubles are decided.
+    """
+    try:
+        with open(path) as fh:
+            page = fh.read()
+    except OSError:
+        return None
+    slate = re.search(r'const SLATE = "([^"]+)"', page)
+    if not slate or slate.group(1) != f"{season}-w{week:02d}":
+        return None
+    games = re.search(r"const GAMES = (\[.*?\n\]);", page, re.S)
+    if not games:
+        return None
+    try:
+        parsed = json.loads(games.group(1))
+    except ValueError:
+        return None
+    return {f"{g['away']}@{g['home']}" for g in parsed if g.get("devinDouble")}
 
 
 def gap_label(edge):
@@ -198,6 +228,9 @@ text-transform:uppercase;color:var(--dim);margin-bottom:4px}
 .bar{height:4px;border-radius:3px;background:#20242e;overflow:hidden;margin-bottom:10px}
 .bar i{display:block;height:100%;background:var(--model)}
 .read{font-size:14px;color:var(--dim)}
+.dbl{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;
+background:#1d2b1d;border:1px solid #33502f;color:#9fd98f;font-size:11px;
+font-weight:600;letter-spacing:.04em;vertical-align:2px}
 .note{margin-top:10px;padding:9px 11px;border-radius:10px;
 background:#1e1a10;border:1px solid #3a2f12;font-size:13px;color:#e6d7a8}
 footer{margin-top:28px;color:var(--dim);font-size:12.5px;border-top:1px solid var(--line);
@@ -375,7 +408,18 @@ def render(season, week, rows, rec, now, scores=None):
                      f'<div class="k">{k}</div></div>')
         o.append("</div></div>")
 
+    doubles = sheet_doubles(season, week) or set()
+    if doubles:
+        o.append('<div class="sub">Double-weight games on the pick sheet: '
+                 + " and ".join(
+                     f"{html.escape(TEAMS[g.split('@')[0]])} at "
+                     f"{html.escape(TEAMS[g.split('@')[1]])}"
+                     for g in sorted(doubles))
+                 + " \u2014 the two largest disagreements with the market, "
+                   "worth two points each on the sheet.</div>")
+
     for r in rows:
+        dbl = f"{r['away']}@{r['home']}" in doubles
         team, by = side(r["pred_margin"], r["home"], r["away"])
         mteam, mby = side(r["spread_line"], r["home"], r["away"])
         edge = r["pred_margin"] - r["spread_line"]
@@ -390,7 +434,9 @@ def render(season, week, rows, rec, now, scores=None):
                  f'<div class="nums{" scored" if sc else ""}">'
                  f'<div class="num market"><div class="k">Market</div>'
                  f'<div class="v">{mteam} −{mby:.1f}</div></div>'
-                 f'<div class="num model"><div class="k">My model</div>'
+                 f'<div class="num model"><div class="k">My model'
+                 + ('<span class="dbl">×2</span>' if dbl else "")
+                 + "</div>"
                  f'<div class="v">{team} −{by:.1f}</div></div>'
                  + (final_box(r["away"], r["home"], sc) if sc else "") + '</div>'
                  + gap_label(edge) +
@@ -405,21 +451,22 @@ def render(season, week, rows, rec, now, scores=None):
 
     o.append(SIGNUP)
 
-    smash = max((abs(r.get("smash") or 0) for r in rows), default=0)
     o.append("</main><footer><b>How to read this.</b> Both numbers are the "
              "expected home margin. Mine comes from a ridge model on "
              "opponent-adjusted efficiency, quarterback value, the injury "
              "report, rest and travel — fit only on games played before the "
-             "one it is predicting.<br><br>"
-             + ("<b>One thing is measured here but deliberately not used.</b> "
-                "Fantasy Guru's offensive-line matchup rating would move each "
-                "game's number by up to 1.5 points. Their pages keep no "
-                "history, so that size could only be assumed rather than fit, "
-                "and its first two scored weeks changed the published side of "
-                "four games and lost all four. The numbers above are the "
-                "model alone; the rating is still recorded every week so it "
-                "can be scored honestly later.<br><br>"
-                if smash > 0.01 else "")
+             "one it is predicting. <b>The number above is that model alone:</b> "
+             "nothing is added to it by hand, and the two double-weight games "
+             "are the two largest disagreements with the market, not a hunch."
+             "<br><br>"
+             + "<b>One thing is measured here but deliberately not used.</b> "
+               "Fantasy Guru's offensive-line matchup rating would move each "
+               "game's number by up to 1.5 points. Their pages keep no "
+               "history, so that size could only be assumed rather than fit, "
+               "and its first two scored weeks changed the published side of "
+               "four games and lost all four. It is recorded every week so it "
+               "can be scored honestly later, and it never moves the number "
+               "published above.<br><br>"
              + "<b>Out of sample it does not beat the closing line:</b> 10.23 "
              "points of average error against the market's 9.82 over 1,962 "
              "games, and 48.3% against the spread. That is published here for "
@@ -517,7 +564,8 @@ GAME_RE = re.compile(
     r'<div class="matchup">(?P<away>[^<]+)<span class="at">at</span>(?P<home>[^<]+)</div>'
     r'<div class="nums(?: scored)?">'
     r'<div class="num market"><div class="k">Market</div><div class="v">(?P<mkt>[^<]+)</div></div>'
-    r'<div class="num model"><div class="k">My model</div><div class="v">(?P<mod>[^<]+)</div></div>'
+    r'<div class="num model"><div class="k">My model(?P<dbl><span class="dbl">[^<]*</span>)?'
+    r'</div><div class="v">(?P<mod>[^<]+)</div></div>'
     r'(?:<div class="num final">.*?</div></div>)?</div>'
     r'(?:<div class="gap">.*?</div>)?(?P<bar><div class="bar">.*?</div>)<div class="read">(?P<read>[^<]*)</div>'
     r'(?:<div class="post">.*?</div>)?', re.S)
@@ -564,7 +612,8 @@ def patch_scores(path, season, week):
         piece = (f'<div class="matchup">{m["away"]}<span class="at">at</span>{m["home"]}</div>'
                  f'<div class="nums{" scored" if sc else ""}">'
                  f'<div class="num market"><div class="k">Market</div><div class="v">{m["mkt"]}</div></div>'
-                 f'<div class="num model"><div class="k">My model</div><div class="v">{m["mod"]}</div></div>'
+                 f'<div class="num model"><div class="k">My model{m["dbl"] or ""}'
+                 f'</div><div class="v">{m["mod"]}</div></div>'
                  + (final_box(away, home, sc) if sc else "") + "</div>"
                  + gap_label(pred - spread)
                  + m["bar"] + f'<div class="read">{m["read"]}</div>')
