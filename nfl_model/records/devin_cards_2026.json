@@ -413,5 +413,82 @@
     false
    ]
   ]
+ },
+ "6": {
+  "slates": [
+   "2026-w06"
+  ],
+  "picks": [
+   [
+    "SEA@DEN",
+    "DEN +2.5",
+    false
+   ],
+   [
+    "HOU@JAX",
+    "JAX -2.5",
+    false
+   ],
+   [
+    "CHI@ATL",
+    "ATL +1.5",
+    true
+   ],
+   [
+    "BAL@CLE",
+    "BAL -3.0",
+    false
+   ],
+   [
+    "TEN@IND",
+    "TEN +7.0",
+    false
+   ],
+   [
+    "NYJ@NE",
+    "NE -7.5",
+    true
+   ],
+   [
+    "NO@NYG",
+    "NYG +1.5",
+    false
+   ],
+   [
+    "CAR@PHI",
+    "CAR -3.0",
+    false
+   ],
+   [
+    "PIT@TB",
+    "TB +2.5",
+    false
+   ],
+   [
+    "ARI@LA",
+    "ARI +12.5",
+    false
+   ],
+   [
+    "LAC@KC",
+    "LAC +7.5",
+    false
+   ],
+   [
+    "BUF@LV",
+    "BUF -5.5",
+    false
+   ],
+   [
+    "DAL@GB",
+    "GB -1.5",
+    false
+   ],
+   [
+    "WAS@SF",
+    "SF -7.5",
+    false
+   ]
+  ]
  }
 }
