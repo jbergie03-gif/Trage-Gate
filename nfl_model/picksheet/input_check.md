@@ -1,5 +1,5 @@
-# Input check — 2026 week 5
-_run 2026-10-08 15:57 PT_
+# Input check — 2026 week 8
+_run 2026-10-28 11:20 PT_
 
 ## Feed freshness
 
@@ -7,20 +7,16 @@ _run 2026-10-08 15:57 PT_
 - injury report: 0h old
 - injury burden the model uses: 0h old
 
-- injury report rows for week 5: **222**, of which **9** carry an Out/Doubtful/Questionable designation
-- teams carrying an injury burden in week 5: **2** (file built through week 5)
+- injury report rows for week 8: **16**, of which **0** carry an Out/Doubtful/Questionable designation
+- **the model is pricing all 32 teams as fully healthy.** Designations are not published until Friday, so its three injury features are zero for every game on this slate.
+- teams carrying an injury burden in week 8: **0** (file built through week 7)
 
 ## Quarterbacks the model is assuming
 
 | Game | Team | Model assumes | Problem |
 |---|---|---|---|
-| NYG @ WAS | WAS | **Jayden Daniels** | injury report says **elbow**; did not start week 4 — A.Kaliakmanis did |
-| SF @ SEA | SEA | **Drew Lock** | did not start week 4 — S.Darnold did |
-| TB @ DAL | TB | Jalon Daniels | only 30 career dropbacks, so the model discounts his rating |
-| CHI @ GB | CHI | Tyson Bagent | only 184 career dropbacks, so the model discounts his rating |
-| BAL @ ATL | BAL | Lamar Jackson | injury report says **did not practice, ankle** |
-| LV @ NE | NE | Drake Maye | injury report says **shoulder** |
-| MIN @ NO | NO | Tyler Shough | injury report says **limited in practice, hand** |
+| PHI @ WAS | PHI | **Jalen Hurts** | did not start week 7 — T.McKee did |
+| CAR @ GB | CAR | Bryce Young | injury report says **knee** |
 
 ## What the flags are worth
 
@@ -28,8 +24,7 @@ Each row re-runs the model with the most likely replacement (most career dropbac
 
 | Game | If instead | Model now | Model then | Line | Edge now | Edge then |
 |---|---|---|---:|---:|---:|---:|
-| NYG @ WAS | Marcus Mariota (2223 career dropbacks) | +3.6 | +3.7 | +3.5 | +0.1 | +0.2 |
-| SF @ SEA | Sam Darnold (3246 career dropbacks) | +0.5 | +0.9 | +3.0 | -2.5 | -2.1 |
+| PHI @ WAS | Tanner McKee (171 career dropbacks) | +3.3 | +6.3 | +5.5 | +2.2 | -0.8 |
 
 Margins are the home team's. Edges are signed for the team in the flagged column, so a shrinking edge means the model likes that side less.
 
