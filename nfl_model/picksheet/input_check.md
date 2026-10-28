@@ -1,5 +1,5 @@
 # Input check — 2026 week 8
-_run 2026-10-28 11:20 PT_
+_run 2026-10-28 11:25 PT_
 
 ## Feed freshness
 
@@ -15,18 +15,8 @@ _run 2026-10-28 11:20 PT_
 
 | Game | Team | Model assumes | Problem |
 |---|---|---|---|
-| PHI @ WAS | PHI | **Jalen Hurts** | did not start week 7 — T.McKee did |
+| PHI @ WAS | PHI | Tanner McKee | only 171 career dropbacks, so the model discounts his rating |
 | CAR @ GB | CAR | Bryce Young | injury report says **knee** |
-
-## What the flags are worth
-
-Each row re-runs the model with the most likely replacement (most career dropbacks on the roster who is not ruled out) and shows how far the pick moves. A published card is **not** changed by this.
-
-| Game | If instead | Model now | Model then | Line | Edge now | Edge then |
-|---|---|---|---:|---:|---:|---:|
-| PHI @ WAS | Tanner McKee (171 career dropbacks) | +3.3 | +6.3 | +5.5 | +2.2 | -0.8 |
-
-Margins are the home team's. Edges are signed for the team in the flagged column, so a shrinking edge means the model likes that side less.
 
 ## What this cannot check
 
