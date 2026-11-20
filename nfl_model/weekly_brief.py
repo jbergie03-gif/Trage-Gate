@@ -9,7 +9,7 @@ memory.
 
     python3 weekly_brief.py                      # next slate, all pulls
     python3 weekly_brief.py --no-pull            # re-read what is on disk
-    python3 weekly_brief.py --roster ~/memory/yahoo-fantasy-team.md
+    python3 weekly_brief.py --roster ~/memory/<bot>/yahoo-fantasy-team.md
 
 Output: ~/fgdata/brief/<season>-w<week>.md (or --out). Nothing here is a
 recommendation; the labels are the reader's job. The model section carries the
@@ -161,6 +161,13 @@ def articles_section():
     return L
 
 
+def default_roster():
+    """~/memory/yahoo-fantasy-team.md, else the first ~/memory/*/ copy."""
+    flat = os.path.expanduser("~/memory/yahoo-fantasy-team.md")
+    nested = sorted(glob.glob(os.path.expanduser("~/memory/*/yahoo-fantasy-team.md")))
+    return flat if os.path.exists(flat) or not nested else nested[0]
+
+
 def roster_names(path):
     if not path or not os.path.exists(path):
         return []
@@ -177,8 +184,7 @@ def main():
     ap.add_argument("--season", type=int)
     ap.add_argument("--week", type=int)
     ap.add_argument("--no-pull", action="store_true")
-    ap.add_argument("--roster", default=os.path.expanduser(
-        "~/memory/yahoo-fantasy-team.md"))
+    ap.add_argument("--roster", default=default_roster())
     ap.add_argument("--out")
     a = ap.parse_args()
 
