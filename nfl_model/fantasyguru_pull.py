@@ -42,13 +42,14 @@ import os
 import re
 import sys
 import time
+import zoneinfo
 
 from playwright.sync_api import sync_playwright
 
 HOME = "https://www.fantasyguru.com"
 OUT = os.path.expanduser(os.environ.get("FG_OUT", "~/fgdata"))
 DAY = 86400
-PACIFIC = datetime.timezone(datetime.timedelta(hours=-7))
+PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
 
 # Read one prop market per click. The page swaps the table client-side, so the
 # whole sweep is a single page load.

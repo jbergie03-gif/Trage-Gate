@@ -482,8 +482,8 @@ Runs the pulls in order (`fetch_data.sh`, `odds_snapshot.py`,
 `fantasyguru_pull.py`) and writes `~/fgdata/brief/<season>-w<week>.md`: the
 model's slate against the DraftKings snapshot with the same notes as the pick
 sheet, the input check, Fantasy Guru's rank for every player on the Yahoo
-roster (read from `~/memory/yahoo-fantasy-team.md`, `--roster` to point
-elsewhere), the largest SMASH line mismatches, and an index of the week's
+roster (read from `~/memory/yahoo-fantasy-team.md`, else the first
+`~/memory/*/yahoo-fantasy-team.md`; `--roster` to point elsewhere), the largest SMASH line mismatches, and an index of the week's
 articles. A Saturday-morning Devin automation runs it and writes the summary
 from that file. `--no-pull` re-reads what is already on disk.
 
