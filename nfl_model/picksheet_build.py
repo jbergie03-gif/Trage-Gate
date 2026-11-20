@@ -138,11 +138,12 @@ def apply_swaps(g, season, week, swaps):
     return g
 
 
-def rows(df, season, week, stars=STARS, now=None, facts=None):
+def rows(df, season, week, stars=STARS, now=None, facts=None, log=True):
     lines, stamp = dk_lines()
     df = week_lines(df, season, week, lines)
     slate = smash_feature.apply(game_model.predict_slate(df, season, week))
-    smash_feature.log(slate, season, week)
+    if log:
+        smash_feature.log(slate, season, week)
     pred = {r.game_id: r.pred_margin for r in slate.itertuples()}
     totals = {r.game_id: (r.pred_total, r.blend_total)
               for r in total_model.predict_slate(df, season, week).itertuples()}
@@ -214,7 +215,10 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True,
         if season is None:
             print("no upcoming games with a posted line")
             return None
-    games, stamp = rows(df, season, week, stars, facts=facts)
+    # With swaps, the first pass only finds the week; the swapped rebuild is
+    # the published one and the only one logged for scoring.
+    log = not swaps
+    games, stamp = rows(df, season, week, stars, facts=facts, log=log)
     if not games:
         print(f"no games with a line for {season} week {week}")
         return None
@@ -222,7 +226,7 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True,
         # Every game of that week is played; the sheet people want is next
         # week's. next_slate() still names the old week until the results land.
         print(f"{season} week {week} is over, building week {week + 1}")
-        nxt, stamp = rows(df, season, week + 1, stars, facts=facts)
+        nxt, stamp = rows(df, season, week + 1, stars, facts=facts, log=log)
         if nxt:
             games, week = nxt, week + 1
     if swaps:
