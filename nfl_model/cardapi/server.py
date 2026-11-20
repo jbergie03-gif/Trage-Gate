@@ -46,6 +46,9 @@ WEEK = os.environ.get("WEEKPAGE", os.path.join(ROOT, "week.html"))
 NOTES = os.environ.get("NOTESPAGE", os.path.join(ROOT, "notes.html"))
 # Season standings, Jonathan vs the model, rendered by standings_build.py.
 STANDINGS = os.environ.get("STANDINGSPAGE", os.path.join(ROOT, "standings.html"))
+# Past sheets posted after the fact (late_sheet.py), served read-only by slate.
+SHEETS = os.environ.get("SHEETSDIR", os.path.join(ROOT, "sheets"))
+SHEET_PATH = re.compile(r"^/sheets/(\d{4}-w\d\d)(?:\.html)?$")
 PORT = int(os.environ.get("PORT", "80"))
 # Behind Caddy on the droplet, so it binds loopback there and the certificate
 # terminates in front of it. Default stays public for running it bare.
@@ -277,6 +280,13 @@ class Handler(BaseHTTPRequestHandler):
             if not os.path.exists(STANDINGS):
                 return self._send(404, {"error": "no standings page published"})
             with open(STANDINGS, "rb") as fh:
+                return self._send(200, fh.read(), "text/html; charset=utf-8")
+        late = SHEET_PATH.match(url.path)
+        if late:
+            path = os.path.join(SHEETS, late.group(1) + ".html")
+            if not os.path.exists(path):
+                return self._send(404, {"error": "no sheet for that slate"})
+            with open(path, "rb") as fh:
                 return self._send(200, fh.read(), "text/html; charset=utf-8")
         if url.path == "/health":
             live = [r for r in subscriber_state().values()
