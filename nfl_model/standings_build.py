@@ -79,6 +79,9 @@ def grade(game, side, score):
     return "W" if adj > 0 else "L" if adj < 0 else "P"
 
 
+SHEET_LINES = "the sheet's DraftKings spread"
+
+
 def jonathan_cards(src, season, devin):
     """Jonathan's picks per slate from the API, mapped to week by the model's slate list.
 
@@ -93,16 +96,31 @@ def jonathan_cards(src, season, devin):
         for p in r["picks"]:
             if p.get("side"):
                 picks[p["game"]] = [p["game"], p["side"], bool(p.get("double"))]
-    cards = {}
+    cards, lines = {}, {}
     for week, d in devin.items():
         for s in d["slates"]:
             if s in by_slate:
                 cards[week] = list(by_slate[s].values())
+                lines[week] = SHEET_LINES
     path = os.path.join(HERE, "records", f"jonathan_cards_{season}.json")
     if os.path.exists(path):
         for week, d in fetch_json(path).items():
-            cards.setdefault(week, d["picks"])
-    return cards
+            if week not in cards:
+                cards[week] = d["picks"]
+                lines[week] = d.get("lines", SHEET_LINES)
+    return cards, lines
+
+
+def line_note(lines):
+    """Which line Jonathan's cards were graded at, grouped by week."""
+    groups = {}
+    for week in sorted(lines, key=int):
+        groups.setdefault(lines[week], []).append(week)
+    parts = [f"{src} (Week{'s' if len(w) > 1 else ''} {', '.join(w)})"
+             for src, w in groups.items()]
+    return ("The model's picks are graded on the DraftKings spread on its "
+            "sheet; Jonathan's on the line his card was filed at: "
+            + "; ".join(parts) + ".")
 
 
 def week_table(week, games, dcard, jcard, scores):
@@ -137,7 +155,7 @@ def rec(t):
 
 def build(season, cards_src):
     devin = fetch_json(os.path.join(HERE, "records", f"devin_cards_{season}.json"))
-    jon = jonathan_cards(cards_src, season, devin)
+    jon, jon_lines = jonathan_cards(cards_src, season, devin)
     weeks = sorted(devin, key=int)
     season_rows, sections = [], []
     grand = {"D": [0, 0, 0, 0], "J": [0, 0, 0, 0]}
@@ -165,14 +183,14 @@ def build(season, cards_src):
             "<table><tr><th>Game</th><th>Final</th><th>Jonathan</th><th></th><th>Model</th><th></th></tr>"
             + "".join(rows) + "</table>")
     stamp = datetime.datetime.now(PACIFIC).strftime("%a %b %-d, %-I:%M %p PT")
-    lead = "tied" if grand["J"][3] == grand["D"][3] else (
+    lead = "Season tied" if grand["J"][3] == grand["D"][3] else (
         f"Jonathan leads by {grand['J'][3] - grand['D'][3]}" if grand["J"][3] > grand["D"][3]
         else f"Model leads by {grand['D'][3] - grand['J'][3]}")
     return (f"<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta name='color-scheme' content='dark'>"
             f"<title>Standings — gridironmath</title><style>{CSS}</style><style id=\"chrome\">{site_chrome.CSS}</style></head><body>"
             + site_chrome.nav("/standings") +
             f"<h1>Jonathan vs the model — {season}</h1>"
-            f"<p class='sub'>Against the spread, each pick graded on the line it was filed at (the DraftKings spread on the sheet when the card was saved). 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
+            f"<p class='sub'>Against the spread. {html.escape(line_note(jon_lines))} 1 point per cover, 2 for a double, pushes void. {html.escape(lead)}. Updated {stamp}.</p>"
             "<table><tr><th>Week</th><th class='n'>Jonathan</th><th class='n'>Pts</th><th class='n'>Model</th><th class='n'>Pts</th><th class='n'>Open</th></tr>"
             + "".join(season_rows)
             + f"<tr class='total'><td>Season</td><td class='n'>{rec(grand['J'])}</td><td class='n'>{grand['J'][3]}</td>"

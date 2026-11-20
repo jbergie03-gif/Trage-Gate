@@ -639,5 +639,154 @@
     false
    ]
   ]
+ },
+ "9": {
+  "slates": [
+   "2026-w09"
+  ],
+  "picks": [
+   [
+    "CIN@ATL",
+    "ATL +3.5",
+    true
+   ],
+   [
+    "DEN@CAR",
+    "CAR +3.0",
+    false
+   ],
+   [
+    "DAL@IND",
+    "IND +4.5",
+    true
+   ],
+   [
+    "NYJ@KC",
+    "NYJ +9.5",
+    false
+   ],
+   [
+    "DET@MIA",
+    "MIA +6.5",
+    false
+   ],
+   [
+    "CLE@NO",
+    "CLE +3.5",
+    false
+   ],
+   [
+    "NYG@PHI",
+    "NYG -3.0",
+    false
+   ],
+   [
+    "LA@WAS",
+    "WAS +4.5",
+    false
+   ],
+   [
+    "HOU@LAC",
+    "HOU -6.0",
+    false
+   ],
+   [
+    "LV@SF",
+    "SF -10.0",
+    false
+   ],
+   [
+    "GB@NE",
+    "NE -3.0",
+    false
+   ],
+   [
+    "ARI@SEA",
+    "ARI +8.5",
+    false
+   ],
+   [
+    "TB@CHI",
+    "CHI -6.0",
+    false
+   ],
+   [
+    "BUF@MIN",
+    "BUF -3.0",
+    false
+   ]
+  ]
+ },
+ "10": {
+  "slates": [
+   "2026-w10"
+  ],
+  "picks": [
+   [
+    "NE@DET",
+    "NE +2.5",
+    false
+   ],
+   [
+    "KC@ATL",
+    "KC -3.0",
+    false
+   ],
+   [
+    "HOU@CLE",
+    "HOU -4.5",
+    false
+   ],
+   [
+    "MIN@GB",
+    "GB -2.5",
+    false
+   ],
+   [
+    "MIA@IND",
+    "IND -3.5",
+    false
+   ],
+   [
+    "CAR@NO",
+    "CAR +2.5",
+    true
+   ],
+   [
+    "BUF@NYJ",
+    "BUF -8.5",
+    false
+   ],
+   [
+    "JAX@TEN",
+    "JAX -10.5",
+    true
+   ],
+   [
+    "LA@ARI",
+    "ARI +9.5",
+    false
+   ],
+   [
+    "SEA@LV",
+    "SEA -6.5",
+    false
+   ],
+   [
+    "SF@DAL",
+    "SF -4.5",
+    false
+   ],
+   [
+    "PIT@CIN",
+    "PIT +3.5",
+    false
+   ],
+   [
+    "LAC@BAL",
+    "BAL -4.5",
+    false
+   ]
+  ]
  }
 }
