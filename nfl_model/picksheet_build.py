@@ -214,8 +214,6 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True,
         if season is None:
             print("no upcoming games with a posted line")
             return None
-    if swaps:
-        df = game_model.build(apply_swaps(g, season, week, swaps), tg, inj)
     games, stamp = rows(df, season, week, stars, facts=facts)
     if not games:
         print(f"no games with a line for {season} week {week}")
@@ -227,6 +225,10 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True,
         nxt, stamp = rows(df, season, week + 1, stars, facts=facts)
         if nxt:
             games, week = nxt, week + 1
+    if swaps:
+        # Swaps name the week being published, so apply them once it is known.
+        df = game_model.build(apply_swaps(g, season, week, swaps), tg, inj)
+        games, stamp = rows(df, season, week, stars, facts=facts)
 
     live = [g for g in games if not g["_locked"]]
     pending = [g for g in games if g["spread"] is None]
