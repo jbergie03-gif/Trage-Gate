@@ -192,7 +192,7 @@ const GAMES = [
     "kickAt": "2026-11-08T10:00:00-08:00",
     "spread": -3.0,
     "total": null,
-    "devin": "CAR +3",
+    "devin": "CAR +3.0",
     "devinNote": "edge 1.4, inside the model's error bar"
   },
   {
@@ -248,7 +248,7 @@ const GAMES = [
     "kickAt": "2026-11-08T10:00:00-08:00",
     "spread": -3.0,
     "total": null,
-    "devin": "NYG -3",
+    "devin": "NYG -3.0",
     "devinNote": "edge 1.7, inside the model's error bar"
   },
   {
@@ -270,7 +270,7 @@ const GAMES = [
     "kickAt": "2026-11-08T13:05:00-08:00",
     "spread": -6.0,
     "total": null,
-    "devin": "HOU -6",
+    "devin": "HOU -6.0",
     "devinNote": "edge 1.5, inside the model's error bar"
   },
   {
@@ -281,7 +281,7 @@ const GAMES = [
     "kickAt": "2026-11-08T13:25:00-08:00",
     "spread": 10.0,
     "total": null,
-    "devin": "SF -10",
+    "devin": "SF -10.0",
     "devinNote": "edge 1.5, inside the model's error bar"
   },
   {
@@ -292,7 +292,7 @@ const GAMES = [
     "kickAt": "2026-11-08T13:25:00-08:00",
     "spread": 3.0,
     "total": null,
-    "devin": "NE -3",
+    "devin": "NE -3.0",
     "devinNote": "edge 1.8, inside the model's error bar"
   },
   {
@@ -314,7 +314,7 @@ const GAMES = [
     "kickAt": "2026-11-08T17:20:00-08:00",
     "spread": 6.0,
     "total": null,
-    "devin": "CHI -6",
+    "devin": "CHI -6.0",
     "devinNote": "coin flip, no opinion"
   },
   {
@@ -325,7 +325,7 @@ const GAMES = [
     "kickAt": "2026-11-09T17:15:00-08:00",
     "spread": -3.0,
     "total": null,
-    "devin": "BUF -3",
+    "devin": "BUF -3.0",
     "devinNote": "coin flip, no opinion"
   }
 ];
@@ -353,7 +353,7 @@ const why = (g) => (g.spread === null ? "no line yet" : "kicked off \u2014 locke
 const open = () => GAMES.filter((g) => !locked(g));
 
 let state = load();
-let revealed = false;
+let revealed = true;
 
 function load() {
   let s = null;

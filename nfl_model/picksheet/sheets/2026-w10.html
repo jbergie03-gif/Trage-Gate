@@ -191,7 +191,7 @@ const GAMES = [
     "kickAt": "2026-11-15T10:00:00-08:00",
     "spread": -3.0,
     "total": null,
-    "devin": "KC -3",
+    "devin": "KC -3.0",
     "devinNote": "coin flip, no opinion"
   },
   {
@@ -342,7 +342,7 @@ const why = (g) => (g.spread === null ? "no line yet" : "kicked off \u2014 locke
 const open = () => GAMES.filter((g) => !locked(g));
 
 let state = load();
-let revealed = false;
+let revealed = true;
 
 function load() {
   let s = null;

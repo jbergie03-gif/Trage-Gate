@@ -50,12 +50,15 @@ def parse_notes(path):
     for block in re.split(r"^## ", text, flags=re.M)[1:]:
         away, home = re.match(r"(\w+) @ (\w+)", block).groups()
         line = re.search(r"^line: (\w+) ([-+]?[\d.]+)", block, re.M)
-        pick = re.search(r"^pick: (\w+ [-+][\d.]+)\s*[—-]\s*(.*)$", block, re.M)
+        pick = re.search(r"^pick: (\w+) ([-+][\d.]+)\s*[—-]\s*(.*)$",
+                         block, re.M)
         fav, num = line.group(1), float(line.group(2))
         spread = -num if fav == home else num
-        note = pick.group(2).strip()
+        team, num = pick.group(1), float(pick.group(2))
+        note = pick.group(3).strip()
         games.append(dict(away=away, home=home, spread=spread,
-                          devin=pick.group(1), devinNote=note,
+                          devin=f"{team} {'+' if num > 0 else ''}{num:.1f}",
+                          devinNote=note,
                           devinDouble=note.upper().startswith("DOUBLE")))
     return snap, games
 
@@ -90,6 +93,8 @@ def build(season, week, notes, out):
                      ("__CHROME_CSS__", site_chrome.CSS),
                      ("__NAV__", site_chrome.nav("/"))):
         page = page.replace(key, val)
+    # Every game is over, so there is no card to send first: show the model.
+    page = page.replace("let revealed = false;", "let revealed = true;", 1)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as fh:
         fh.write(page)
