@@ -12,8 +12,14 @@ being played destroys that.
 Devin's side is the model's, and the two largest disagreements with the market
 get the double weight -- the same rule every week rather than a judgment call.
 
+A starter the schedule has wrong is fixed with --swap TEAM="QB Name" (the
+same form input_check.py takes), and --fact TEAM="..." puts the sourced reason
+under that team's game, so the sheet says why the model's quarterback differs
+from the schedule.
+
 Run: python3 picksheet_build.py [--out picksheet/index.html]
                                [--season S --week W] [--stars N]
+                               [--swap TEAM="QB Name"] [--fact TEAM="text"]
 """
 import argparse
 import datetime
@@ -99,7 +105,40 @@ def week_lines(df, season, week, lines):
     return df
 
 
-def rows(df, season, week, stars=STARS, now=None):
+def apply_swaps(g, season, week, swaps):
+    """Put the named quarterback in the schedule row before the model reads it.
+
+    The model takes its starter from games.csv (`home_qb_id`/`away_qb_id`), so
+    editing that row is what makes the rating, the inexperience flag and the
+    pick all follow the real starter.
+    """
+    if not swaps:
+        return g
+    players = pd.read_csv(os.path.join(game_model.DATA, "players.csv"),
+                          low_memory=False)
+    g = g.copy()
+    wk = (g["season"] == season) & (g["week"] == week)
+    for team, who in swaps:
+        hit = players[(players["position"] == "QB")
+                      & (players["display_name"].str.lower() == who.lower())]
+        if hit.empty:
+            raise SystemExit(f"--swap: no quarterback named {who}")
+        qb_id = hit.iloc[0]["gsis_id"]
+        found = False
+        for side in ("home", "away"):
+            m = wk & (g[f"{side}_team"] == team)
+            if m.any():
+                found = True
+                print(f"swap {team}: {g.loc[m, f'{side}_qb_name'].iloc[0]}"
+                      f" -> {who}")
+                g.loc[m, f"{side}_qb_id"] = qb_id
+                g.loc[m, f"{side}_qb_name"] = who
+        if not found:
+            raise SystemExit(f"--swap: {team} has no game in week {week}")
+    return g
+
+
+def rows(df, season, week, stars=STARS, now=None, facts=None):
     lines, stamp = dk_lines()
     df = week_lines(df, season, week, lines)
     slate = smash_feature.apply(game_model.predict_slate(df, season, week))
@@ -127,6 +166,15 @@ def rows(df, season, week, stars=STARS, now=None):
                             devinNote="no line posted", _locked=True,
                             _edge=-1))
             continue
+        if started:
+            # Kicked off before this build: the card is a record of picks made
+            # before kickoff, so the model makes none here after the fact.
+            out.append(dict(g, spread=round(float(spread), 1),
+                            total=round(float(total), 1), devin="",
+                            devinNote="kicked off before the line snapshot"
+                            " \u2014 no model pick",
+                            _locked=True, _edge=-1))
+            continue
         edge = pred[r.game_id] - spread
         home = edge > 0
         team = r.home_team if home else r.away_team
@@ -135,7 +183,9 @@ def rows(df, season, week, stars=STARS, now=None):
         out.append(dict(
             g, spread=round(float(spread), 1), total=round(float(total), 1),
             devin=f"{team} {'+' if num > 0 else ''}{num:.1f}",
-            devinNote=note(edge),
+            devinNote="; ".join([note(edge)] + [
+                facts[t] for t in (r.away_team, r.home_team)
+                if facts and t in facts]),
             modelTotal=(None if model_total is None
                         else round(float(model_total), 1)),
             blendTotal=(None if blend_total is None
@@ -154,15 +204,19 @@ def rows(df, season, week, stars=STARS, now=None):
     return out, stamp
 
 
-def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
-    df = game_model.build(*game_model.load())
+def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True,
+          swaps=None, facts=None):
+    g, tg, inj = game_model.load()
+    df = game_model.build(g, tg, inj)
     auto = season is None or week is None
     if auto:
         season, week = game_model.next_slate(df)
         if season is None:
             print("no upcoming games with a posted line")
             return None
-    games, stamp = rows(df, season, week, stars)
+    if swaps:
+        df = game_model.build(apply_swaps(g, season, week, swaps), tg, inj)
+    games, stamp = rows(df, season, week, stars, facts=facts)
     if not games:
         print(f"no games with a line for {season} week {week}")
         return None
@@ -170,7 +224,7 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
         # Every game of that week is played; the sheet people want is next
         # week's. next_slate() still names the old week until the results land.
         print(f"{season} week {week} is over, building week {week + 1}")
-        nxt, stamp = rows(df, season, week + 1, stars)
+        nxt, stamp = rows(df, season, week + 1, stars, facts=facts)
         if nxt:
             games, week = nxt, week + 1
 
@@ -200,11 +254,17 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
         fh.write(page)
     # Kickoff times for the card API to enforce, since the page's own lock is
     # JavaScript over editable storage and /card can be POSTed directly.
+    # Other slates stay in the file: the late sheets under /sheets rely on
+    # their kickoffs being there so /card keeps refusing them.
     locks = os.path.join(os.path.dirname(os.path.abspath(out)),
                          "kickoffs.json")
+    known = {}
+    if os.path.exists(locks):
+        with open(locks) as fh:
+            known = json.load(fh)
+    known[slate] = {f"{g['away']}@{g['home']}": g["kickAt"] for g in games}
     with open(locks, "w") as fh:
-        json.dump({slate: {f"{g['away']}@{g['home']}": g["kickAt"]
-                           for g in games}}, fh, indent=2)
+        json.dump(dict(sorted(known.items())), fh, indent=2)
     kicked = len(games) - len(live) - len(pending)
     print(f"wrote {out} and {locks}: {len(games)} games, "
           f"{kicked} already kicked off, {len(pending)} waiting on a line")
@@ -215,7 +275,7 @@ def build(season=None, week=None, out=OUT, stars=STARS, fact_check=True):
     # check runs every time and prints, so a stale input has to be read past
     # rather than discovered afterwards.
     if fact_check:
-        report = input_check.check(season, week, game_model.DATA)
+        report = input_check.check(season, week, game_model.DATA, swaps)
         path = os.path.join(os.path.dirname(os.path.abspath(out)),
                             "input_check.md")
         with open(path, "w") as fh:
@@ -233,5 +293,22 @@ if __name__ == "__main__":
     ap.add_argument("--stars", type=int, default=STARS)
     ap.add_argument("--no-check", action="store_true",
                     help="skip the input fact-check")
+    ap.add_argument("--swap", action="append", default=[],
+                    metavar='TEAM="QB Name"',
+                    help="start this quarterback for TEAM instead of the "
+                         "schedule's")
+    ap.add_argument("--fact", action="append", default=[],
+                    metavar='TEAM="text"',
+                    help="sourced note shown under TEAM's game")
     a = ap.parse_args()
-    build(a.season, a.week, a.out, a.stars, fact_check=not a.no_check)
+
+    def pairs(items):
+        out = []
+        for s in items:
+            team, _, val = s.partition("=")
+            if val:
+                out.append((team.strip().upper(), val.strip()))
+        return out
+
+    build(a.season, a.week, a.out, a.stars, fact_check=not a.no_check,
+          swaps=pairs(a.swap), facts=dict(pairs(a.fact)))
