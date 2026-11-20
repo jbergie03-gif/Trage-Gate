@@ -95,6 +95,12 @@ def build(season, week, notes, out):
         page = page.replace(key, val)
     # Every game is over, so there is no card to send first: show the model.
     page = page.replace("let revealed = false;", "let revealed = true;", 1)
+    page = page.replace(
+        """Devin's card is hidden until you send yours,
+  so your picks are your own. Re-sending before kickoff is fine — it files a new
+  revision with its own timestamp rather than overwriting the earlier card.""",
+        "Every game is over, so Devin's card is shown and no card can be sent "
+        "from this page.", 1)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as fh:
         fh.write(page)
