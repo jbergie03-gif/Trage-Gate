@@ -43,6 +43,10 @@ OUT = os.path.join(ROOT, "picksheet", "index.html")
 ODDS = os.path.join(ROOT, "data", "odds_snapshots.csv")
 BOOK = "draftkings"
 STARS = 2
+# DraftKings' start time wins over games.csv when they differ by this much: a
+# flex or time-slot move the schedule feed has not picked up. Smaller gaps are
+# the feed reporting the actual kickoff of a game already under way.
+RESCHEDULED = pd.Timedelta(minutes=10)
 
 
 def dk_lines():
@@ -50,6 +54,7 @@ def dk_lines():
 
     Keyed on the date as well as the teams because divisional opponents meet
     twice a season, and the same pair of abbreviations would otherwise collide.
+    Each value is (spread, total, kickoff in Pacific).
     """
     if not os.path.exists(ODDS):
         return {}, None
@@ -63,7 +68,8 @@ def dk_lines():
     for r in d.itertuples():
         start = pd.to_datetime(r.commence_time, utc=True)
         day = start.tz_convert(PACIFIC).date()
-        out[(r.away, r.home, day)] = (r.spread_line, r.total_line)
+        out[(r.away, r.home, day)] = (r.spread_line, r.total_line,
+                                      start.tz_convert(PACIFIC))
     stamp = pd.to_datetime(taken).strftime("%Y-%m-%d %H:%M PT")
     return out, stamp
 
@@ -98,9 +104,22 @@ def week_lines(df, season, week, lines):
     kicks = {}
     for i, r in wk.iterrows():
         kicks[i] = weekly_post.kickoff(r.to_dict())
-        dk = lines.get((r["away_team"], r["home_team"], kicks[i].date()))
-        if dk and not any(pd.isna(x) for x in dk):
-            df.loc[i, ["spread_line", "total_line"]] = dk
+        # Within three days either way, so a game flexed to another day still
+        # finds its line; the two meetings of a pair are weeks apart.
+        dk = next((lines[k] for k in (
+            (r["away_team"], r["home_team"],
+             kicks[i].date() + datetime.timedelta(days=n))
+            for n in (0, -1, 1, -2, 2, -3, 3)) if k in lines), None)
+        if not dk:
+            continue
+        spread, total, start = dk
+        if abs(start - kicks[i]) >= RESCHEDULED:
+            print(f"kickoff {r['away_team']}@{r['home_team']}: games.csv says "
+                  f"{kicks[i]:%a %-I:%M %p}, DraftKings {start:%a %-I:%M %p} PT;"
+                  " using DraftKings")
+            kicks[i] = start.to_pydatetime()
+        if not pd.isna(spread) and not pd.isna(total):
+            df.loc[i, ["spread_line", "total_line"]] = (spread, total)
     df["kick_pt"] = pd.Series(kicks, dtype=object)
     return df
 
