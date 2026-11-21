@@ -198,8 +198,8 @@ def note_line(r):
 def report(path=LOG):
     """Grade the last forecast before kickoff against the final total."""
     f = pd.read_csv(path)
-    f = f[f.hours_to_kick > 0].sort_values("hours_to_kick").drop_duplicates(
-        "game_id")
+    f = f[(f.hours_to_kick > 0) & ~f.flag.str.startswith("forecast unavailable")]
+    f = f.sort_values("hours_to_kick").drop_duplicates("game_id")
     g = pd.read_csv(game_model.GAMES, usecols=["game_id", "total", "total_line"])
     d = f.merge(g, on="game_id").dropna(subset=["total", "total_line"])
     d = d[d.total != d.total_line]
