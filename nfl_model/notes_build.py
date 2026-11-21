@@ -17,11 +17,14 @@ the ones that matter when a reader has to decide what to trust:
     fact: Tua Tagovailoa did not practise Wednesday (oblique).
     unknown: Stefanski will not name a starter.
     read: The model's biggest edge of the week rests on that unknown.
+    weather: 35°F, wind 22 mph (gusts 31) at kickoff (forecast). Lean under.
 
 `fact` is something published and checkable. `unknown` is something nobody
 knows yet, written down so it cannot be quietly turned into a fact later.
 `read` is opinion, and it is labelled opinion. A note with a read but no fact
-is the failure mode this format exists to prevent.
+is the failure mode this format exists to prevent. `weather` is the kickoff
+forecast, written by weather.py --notes; it is a forecast, so it is neither a
+fact nor a read.
 
 A game may also carry a `caption:` line: the same game said in one sentence,
 for the Instagram post that sends people to the page. `--caption` collects
@@ -38,7 +41,8 @@ import re
 
 import site_chrome
 
-KEYS = ("model", "line", "pick", "fact", "unknown", "read", "caption")
+KEYS = ("model", "line", "pick", "fact", "unknown", "read", "weather",
+        "caption")
 CAPTION_MAX = 2200
 # Case-insensitive: a shouted URL is the same dead text as a quiet one. The
 # dotted quad is here because the site spent its first weeks on a bare IP,
@@ -56,6 +60,7 @@ PAGE = """<!DOCTYPE html>
   :root {{
     --bg:#0f1115; --card:#181b22; --line:#262b36; --text:#e8eaed;
     --dim:#9aa0ac; --fact:#3fb950; --unknown:#d9a20b; --model:#a371f7;
+    --weather:#58a6ff;
   }}
   * {{ box-sizing:border-box; }}
   body {{ margin:0; padding:20px 12px 60px; background:var(--bg);
@@ -80,6 +85,7 @@ PAGE = """<!DOCTYPE html>
   .tag.fact {{ background:#123a1c; color:var(--fact); }}
   .tag.unknown {{ background:#3a2d08; color:var(--unknown); }}
   .tag.read {{ background:#241a38; color:var(--model); }}
+  .tag.weather {{ background:#0d2a45; color:var(--weather); }}
   footer {{ color:var(--dim); font-size:12.5px; border-top:1px solid var(--line);
     margin-top:24px; padding-top:14px; }}
   a {{ color:#58a6ff; }}
@@ -126,7 +132,7 @@ def parse(text):
             # Repeatable: a caption reads as paragraphs, and one physical line
             # per paragraph keeps the source diffable.
             head.setdefault(key, []).append(val)
-        elif key in ("fact", "unknown", "read"):
+        elif key in ("fact", "unknown", "read", "weather"):
             target["notes"].append((key, val)) if cur is not None \
                 else head.setdefault(key, val)
         elif key in KEYS or cur is None:
