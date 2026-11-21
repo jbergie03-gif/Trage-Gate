@@ -81,9 +81,13 @@ def weather_section(season, week, log=True):
         rows = weather.pull(season, week)
     except Exception as e:  # noqa: BLE001 - the brief goes out without it
         return ["## Weather at kickoff", f"- forecast pull failed: {e!r}"]
+    saved = []
     if log:
-        weather.log(rows)
-    return weather.section(rows) + ["", "Notes `weather:` lines "
+        try:
+            weather.log(rows)
+        except OSError as e:
+            saved = ["", f"- forecast log not saved: {e!r}"]
+    return weather.section(rows) + saved + ["", "Notes `weather:` lines "
                                     "(`python3 weather.py --notes --no-log`):",
                                     ""] + [f"    {weather.note_line(r)}  <- "
                                            f"{r['match']}" for r in rows]
