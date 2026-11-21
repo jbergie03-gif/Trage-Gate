@@ -49,13 +49,22 @@ COLS = ["pulled_at", "game_id", "season", "week", "kick_pt", "hours_to_kick",
         "snow_in", "flag"]
 
 
-def roof_of(row):
+def host_of(row, games):
+    """The team whose stadium the game is in; None for an unmapped neutral site."""
+    if row.get("location") != "Neutral" or row.get("stadium") in stadiums.NEUTRAL:
+        return row["home_team"]
+    home = games[(games.stadium_id == row.get("stadium_id"))
+                 & (games.location == "Home")].home_team
+    return home.mode().iat[0] if len(home) else None
+
+
+def roof_of(row, host):
     roof = row.get("roof")
     if isinstance(roof, str) and roof:
-        if roof in FIXED_ROOF and row["home_team"] in RETRACTABLE:
+        if roof in FIXED_ROOF and host in RETRACTABLE:
             return "retractable"
         return roof
-    return "retractable" if row["home_team"] in RETRACTABLE else "outdoors"
+    return "retractable" if host in RETRACTABLE else "outdoors"
 
 
 def flag(roof, temp, wind, prob, snow):
@@ -114,15 +123,19 @@ def slate(season, week):
 def pull(season, week, now=None):
     now = now or dt.datetime.now(dt.timezone.utc)
     rows = []
+    games = pd.read_csv(game_model.GAMES)
     for _, r in slate(season, week).iterrows():
         kick = game_model.kickoff_utc(r).astimezone(dt.timezone.utc)
-        roof = roof_of(r)
+        host = host_of(r, games)
+        roof = roof_of(r, host)
         row = dict(pulled_at=now.astimezone(PACIFIC).strftime("%Y-%m-%d %H:%M"),
                    game_id=r.game_id, season=season, week=week,
                    kick_pt=kick.astimezone(PACIFIC).strftime("%a %-I:%M %p"),
                    hours_to_kick=round((kick - now).total_seconds() / 3600, 1),
                    roof=roof)
-        site = stadiums.site(r.home_team, r.get("stadium"))
+        site = host and stadiums.site(host, r.get("stadium"))
+        if roof not in FIXED_ROOF and not site and kick > now:
+            row["flag"] = f"forecast unavailable (no map spot for {r.get('stadium')})"
         if roof not in FIXED_ROOF and site and kick > now:
             try:
                 row.update(fetch(site[0], site[1], kick))
