@@ -39,7 +39,7 @@ import pandas as pd
 
 PT = zoneinfo.ZoneInfo("America/Los_Angeles")
 SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
-SCOREBOARD = SITE + "scoreboard?seasontype=2&week={week}&dates={season}"
+SCOREBOARD = SITE + "scoreboard?seasontype={stype}&week={week}&dates={season}"
 CURRENT = SITE + "scoreboard"
 DEPTH = SITE + "teams/{team}/depthcharts"
 SUMMARY = SITE + "summary?event={event}"
@@ -80,8 +80,28 @@ def team(abbr):
     return ABBR.get(abbr, abbr)
 
 
+REGULAR_WEEKS = 18
+# nflverse playoff weeks 19-22 are ESPN postseason weeks 1, 2, 3 and 5 (4 is the Pro Bowl).
+PLAYOFF_ESPN = {19: 1, 20: 2, 21: 3, 22: 5}
+
+
+def espn_week(week):
+    """model week -> (ESPN season type, ESPN week)."""
+    return (3, PLAYOFF_ESPN[week]) if week > REGULAR_WEEKS else (2, week)
+
+
+def model_week(stype, week):
+    if stype == 3:
+        return {v: k for k, v in PLAYOFF_ESPN.items()}.get(week, REGULAR_WEEKS + week)
+    return week
+
+
 def slate(season, week):
-    url = CURRENT if season is None else SCOREBOARD.format(season=season, week=week)
+    if season is None:
+        url = CURRENT
+    else:
+        stype, w = espn_week(week)
+        url = SCOREBOARD.format(stype=stype, season=season, week=w)
     d = get(url)
     games = []
     for ev in d["events"]:
@@ -94,7 +114,8 @@ def slate(season, week):
             away_id=side["away"]["team"]["id"], home_id=side["home"]["team"]["id"],
             kick=dt.datetime.fromisoformat(ev["date"].replace("Z", "+00:00")).astimezone(PT),
             state=ev["status"]["type"]["state"]))
-    return int(d["season"]["year"]), int(d["week"]["number"]), games
+    year, stype = int(d["season"]["year"]), int(d["season"]["type"])
+    return year, model_week(stype, int(d["week"]["number"])), games
 
 
 def depth_chart(team_id):
