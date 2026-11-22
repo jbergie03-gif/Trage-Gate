@@ -191,9 +191,9 @@ def model_qbs(season, week, data=DATA):
         return {}
     g = pd.read_csv(path)
     g = g[(g["season"] == season) & (g["week"] == week)]
-    out = dict(zip(g["home_team"], g["home_qb_name"]))
-    out.update(zip(g["away_team"], g["away_qb_name"]))
-    return out
+    pairs = list(zip(g["home_team"], g["home_qb_name"])) + \
+        list(zip(g["away_team"], g["away_qb_name"]))
+    return {t: q for t, q in pairs if pd.notna(q) and str(q).strip()}
 
 
 def roster(path):
