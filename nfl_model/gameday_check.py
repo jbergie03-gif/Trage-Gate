@@ -181,7 +181,8 @@ def roster(path):
     if not path or not os.path.exists(path):
         return rows
     for line in open(path):
-        m = re.match(r"\|\s*([A-Z/]+)\s*\|\s*([A-Za-z.' -]+?)\s*(?:\([A-Z]+\))?\s*\|\s*([A-Z]*)\s*\|", line)
+        m = re.match(r"\|\s*([A-Z/]+)\s*\|\s*([A-Za-z.' -]+?)\s*(?:\([A-Z]+\))?"
+                     r"\s*\|\s*([A-Z]*)\s*\|", line)
         if m and m.group(1) != "DEF" and m.group(2).lower() != "player":
             rows.append((m.group(2), m.group(3)))
     return rows
@@ -219,7 +220,8 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
     nfv, nfv_stamp = nflverse_qb1(season, data)
     last = last_passers(season, week, [g[s] for g in up for s in ("away", "home")])
 
-    L = [f"## Game-day check — {season} week {week} (ESPN depth charts, run {now:%a %Y-%m-%d %H:%M} PT)", ""]
+    L = [f"## Game-day check — {season} week {week} "
+         f"(ESPN depth charts, run {now:%a %Y-%m-%d %H:%M} PT)", ""]
     if not up:
         return L + ["No games left to kick off this week."]
     L += ["| Game | Kick (PT) | Inactives out ~ | Out by this run? |", "|---|---|---|---|"]
@@ -233,7 +235,8 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
 
     # ---- quarterbacks ------------------------------------------------------
     L += ["### Quarterbacks", "",
-          "| Game | Team | Model assumes | ESPN QB1 | nflverse QB1 | Threw most passes last game | Flag |",
+          "| Game | Team | Model assumes | ESPN QB1 | nflverse QB1 "
+          "| Threw most passes last game | Flag |",
           "|---|---|---|---|---|---|---|"]
     swaps, maybes = [], []
     for g in sorted(up, key=lambda g: g["kick"]):
@@ -279,7 +282,8 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
 
     # ---- skill-position starters with a tag ---------------------------------
     L += ["### Starters with an injury tag (who is next on the chart)", "",
-          "| Game | Team | Spot | Starter | Tag | Next healthy on chart |", "|---|---|---|---|---|---|"]
+          "| Game | Team | Spot | Starter | Tag | Next healthy on chart |",
+          "|---|---|---|---|---|---|"]
     n = 0
     for g in sorted(up, key=lambda g: g["kick"]):
         for side in ("away", "home"):
@@ -288,7 +292,8 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
                 if players and players[0][2]:
                     n += 1
                     L.append(f"| {g['away']} @ {g['home']} | {g[side]} | {slot.upper()} | "
-                             f"{players[0][0]} | {players[0][2]} | {first_healthy(players, {players[0][0]})} |")
+                             f"{players[0][0]} | {players[0][2]} | "
+                             f"{first_healthy(players, {players[0][0]})} |")
     if not n:
         L.append("| – | – | – | no RB/WR/TE/K starter carries a tag | | |")
     L.append("")
@@ -298,7 +303,8 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
     if mine:
         kick = {g[s]: g for g in games for s in ("away", "home")}
         L += ["### Jonathan's roster on the depth charts", "",
-              "| Player | Team (ESPN) | Spot | Tag | Kick (PT) | Note |", "|---|---|---|---|---|---|"]
+              "| Player | Team (ESPN) | Spot | Tag | Kick (PT) | Note |",
+              "|---|---|---|---|---|---|"]
         for name, listed in mine:
             hit = [(t, slot, i + 1, tag) for t, ch in charts.items()
                    for slot, ps in ch.items() for i, (p, _, tag) in enumerate(ps)
