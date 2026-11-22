@@ -81,18 +81,32 @@ def team(abbr):
 
 
 REGULAR_WEEKS = 18
-# nflverse playoff weeks 19-22 are ESPN postseason weeks 1, 2, 3 and 5 (4 is the Pro Bowl).
-PLAYOFF_ESPN = {19: 1, 20: 2, 21: 3, 22: 5}
+_PLAYOFFS = {}
 
 
-def espn_week(week):
+def playoff_weeks(season):
+    """model week (19-22) -> ESPN postseason week, from ESPN's own calendar.
+
+    The Pro Bowl takes a postseason week in some years and not others (2025: Super
+    Bowl is week 5; 2026: week 4), so the mapping is read, not assumed.
+    """
+    if season not in _PLAYOFFS:
+        cal = get(SCOREBOARD.format(stype=2, season=season, week=1))["leagues"][0]["calendar"]
+        post = next(c["entries"] for c in cal if str(c.get("value")) == "3")
+        weeks = [int(e["value"]) for e in post if e.get("label") != "Pro Bowl"]
+        _PLAYOFFS[season] = dict(zip(range(REGULAR_WEEKS + 1, REGULAR_WEEKS + 5), weeks))
+    return _PLAYOFFS[season]
+
+
+def espn_week(season, week):
     """model week -> (ESPN season type, ESPN week)."""
-    return (3, PLAYOFF_ESPN[week]) if week > REGULAR_WEEKS else (2, week)
+    return (3, playoff_weeks(season)[week]) if week > REGULAR_WEEKS else (2, week)
 
 
-def model_week(stype, week):
+def model_week(season, stype, week):
     if stype == 3:
-        return {v: k for k, v in PLAYOFF_ESPN.items()}.get(week, REGULAR_WEEKS + week)
+        back = {v: k for k, v in playoff_weeks(season).items()}
+        return back.get(week, REGULAR_WEEKS + week)
     return week
 
 
@@ -100,7 +114,7 @@ def slate(season, week):
     if season is None:
         url = CURRENT
     else:
-        stype, w = espn_week(week)
+        stype, w = espn_week(season, week)
         url = SCOREBOARD.format(stype=stype, season=season, week=w)
     d = get(url)
     games = []
@@ -115,7 +129,7 @@ def slate(season, week):
             kick=dt.datetime.fromisoformat(ev["date"].replace("Z", "+00:00")).astimezone(PT),
             state=ev["status"]["type"]["state"]))
     year, stype = int(d["season"]["year"]), int(d["season"]["type"])
-    return year, model_week(stype, int(d["week"]["number"])), games
+    return year, model_week(year, stype, int(d["week"]["number"])), games
 
 
 def depth_chart(team_id):
