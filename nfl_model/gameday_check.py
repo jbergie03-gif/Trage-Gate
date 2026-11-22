@@ -7,8 +7,8 @@ who were not going to play. This reads, for every game still to kick off:
 
 * ESPN's live depth chart (QB, RB, WR1-3, TE, K) with each player's current
   injury tag, cross-checked against nflverse's latest depth-chart snapshot,
-* ESPN's game injury report, which after the official inactives are posted
-  (about 90 minutes before kickoff) is the game-day list,
+* ESPN's game injury report (injury designations; it does not carry the
+  official inactive list, which teams post about 90 minutes before kickoff),
 * who threw the most passes in each team's last game (ESPN box score),
 
 and reports where the model's assumed quarterback disagrees with any of them,
@@ -245,11 +245,14 @@ def check(season=None, week=None, roster_path=None, data=DATA, with_model=True):
          f"(ESPN depth charts, run {now:%a %Y-%m-%d %H:%M} PT)", ""]
     if not up:
         return L + ["No games left to kick off this week."]
-    L += ["| Game | Kick (PT) | Inactives out ~ | Out by this run? |", "|---|---|---|---|"]
+    L += ["| Game | Kick (PT) | Inactives due ~ | Run after that time? |", "|---|---|---|---|"]
     for g in sorted(up, key=lambda g: g["kick"]):
         due = g["kick"] - INACTIVES_BEFORE
         L.append(f"| {g['away']} @ {g['home']} | {g['kick']:%a %-I:%M %p} | "
                  f"{due:%a %-I:%M %p} | {'yes' if now >= due else '**no — rerun after**'} |")
+    L += ["", "Tags below are injury designations (ESPN depth charts and game injury "
+          "reports), not the official inactive list: a healthy scratch has no tag, so "
+          "after the time above confirm a flagged player on the team's posted inactives."]
     L += ["", "Sources: ESPN team depth charts and game injury reports (live), "
           f"nflverse depth charts ({nfv_stamp or 'not downloaded'}), ESPN box "
           "scores for last game's passer; the model's QB is games.csv.", ""]

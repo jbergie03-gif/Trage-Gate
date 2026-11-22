@@ -885,8 +885,9 @@ game injury reports and lists:
 
 `weekly_brief.py` includes this section, and an ESPN outage prints a one-line
 failure instead of stopping the brief. Like `input_check.py`, it
-**never edits a pick**. It cannot see a player who is active but limited, or a
-scratch made after the inactives post.
+**never edits a pick**. Its tags are injury designations, not the official
+inactive list, so it misses healthy scratches; it also cannot see a player who
+is active but limited.
 
 ## Data sources
 
