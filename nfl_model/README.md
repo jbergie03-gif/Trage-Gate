@@ -819,6 +819,43 @@ Points, downloadable as CSV, with the free tier capped at top-20 leaderboards
 and full access at $749.99/year. Worth revisiting only if an OL feature first
 shows value.
 
+## 13. `weather.py` — does weather move the total?
+
+Jonathan's question (2026-11-21): does weather hurt games, which kind, how
+much, and does it show up in overs and unders? 7,017 games 2000–2025 with a
+closing total, 5,264 of them outdoors; precipitation parsed from nflverse
+play-by-play's game `weather` text, wind and temperature from games.csv (two
+impossible wind readings, 70 and 71 mph, dropped).
+
+| Outdoor games | Games | Avg line | Avg points | Under % |
+|---|---|---|---|---|
+| Dry, wind < 10 mph, 46–85°F | 2,120 | 43.5 | 44.5 | 48.6 |
+| Wind 11–15 mph | 945 | 42.6 | 42.2 | 55.5 |
+| Wind 15+ mph | 647 | 42.0 | 40.5 | 56.7 ±3.8 |
+| Wind 25+ mph | 39 | 39.5 | 30.3 | 81 ±13 |
+| Rain | 296 | 42.2 | 39.8 | 61.6 ±5.6 |
+| 32°F or colder, wind < 10 | 185 | 43.0 | 44.9 | 45.4 |
+| Snow | 72 | 41.8 | 45.0 | 41 ±12 |
+
+Wind and rain push games under the close in both halves of the window; cold
+and snow alone do not (the market already shades those lines down). Passing
+falls from 6.20 yards per pass play at 0–5 mph to 5.66 at 16–20, and 40+
+yard field goals from 70.4% to 65.3% (54.8% in snow). Month of the season
+does nothing on its own.
+
+The catch: that weather is the reading *during* the game, which the close
+could not see. So `weather.py` saves the Open-Meteo forecast for every game's
+kickoff window each time it runs and labels the lean (wind 15+ = lean under,
+11–14 = small lean, rain 50%+ = lean under, snow = no lean), and
+`weather.py --report` grades those labels against final totals. The Saturday
+brief carries the table and a `weather:` line per game for the notes page.
+
+```bash
+python3 weather.py                 # next slate, logs to $WEATHER_LOG
+python3 weather.py --notes --no-log
+python3 weather.py --report
+```
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
@@ -832,6 +869,8 @@ shows value.
   JSON in the page payload. Percentages exist from 2021 on, patchily in 2023;
   line history reaches back to 2019.
 - Kalshi public trade API — live books.
+- [Open-Meteo](https://open-meteo.com/) — free hourly forecasts at each
+  stadium for `weather.py`.
 
 ## Standing caveat
 

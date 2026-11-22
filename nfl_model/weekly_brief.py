@@ -10,6 +10,7 @@ memory.
     python3 weekly_brief.py                      # next slate, all pulls
     python3 weekly_brief.py --no-pull            # re-read what is on disk
     python3 weekly_brief.py --roster ~/memory/<bot>/yahoo-fantasy-team.md
+    WEATHER_LOG=<path> python3 weekly_brief.py   # keep the forecast log there
 
 Output: ~/fgdata/brief/<season>-w<week>.md (or --out). Nothing here is a
 recommendation; the labels are the reader's job. The model section carries the
@@ -29,6 +30,7 @@ import fantasyguru_pull as fg
 import game_model
 import input_check
 import picksheet_build
+import weather
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACIFIC = fg.PACIFIC
@@ -71,6 +73,24 @@ def model_section(df, season, week):
     L += ["", "Spread model is scored flat; totals model has no demonstrated "
           "O/U edge (49% historically) — totals are leans, not plays."]
     return L
+
+
+def weather_section(season, week, log=True):
+    """Kickoff forecasts, logged so the under lean gets graded on forecasts."""
+    try:
+        rows = weather.pull(season, week)
+    except Exception as e:  # noqa: BLE001 - the brief goes out without it
+        return ["## Weather at kickoff", f"- forecast pull failed: {e!r}"]
+    saved = []
+    if log:
+        try:
+            weather.log(rows)
+        except OSError as e:
+            saved = ["", f"- forecast log not saved: {e!r}"]
+    return weather.section(rows) + saved + ["", "Notes `weather:` lines "
+                                    "(`python3 weather.py --notes --no-log`):",
+                                    ""] + [f"    {weather.note_line(r)}  <- "
+                                           f"{r['match']}" for r in rows]
 
 
 def check_section(season, week):
@@ -198,6 +218,7 @@ def main():
         L += pulls(season, week) + [""]
         df = game_model.build(*game_model.load())
     L += model_section(df, season, week) + [""]
+    L += weather_section(season, week, log=not a.no_pull) + [""]
     L += check_section(season, week) + [""]
     L += rankings_section(roster_names(a.roster)) + [""]
     L += smash_section() + [""]
