@@ -192,19 +192,18 @@ def section(games, snap, stamp, shares=None, span=None):
         elif gain == 0 and dk and top and top[0] != RECORD:
             if dk[1] is not None and top[2] is not None and top[2] > dk[1]:
                 notes.append(f"same number, better price at {name(top[0])}")
-        edges = "–"
-        if dk:
-            # nflverse home-favored convention: spread = -(home side number)
-            dk_spread = -dk[0] if home else dk[0]
-            e_dk = margin - dk_spread
-            edges = edge_note(e_dk)
-            if pin:
+        # nflverse home-favored convention: spread = -(home side number);
+        # an edge > 0 favors the home side.
+        sign = 1 if home else -1
+        e_dk = margin - (-dk[0] if home else dk[0]) if dk else None
+        edges = edge_note(e_dk) if dk else "–"
+        if pin:
+            e_pin = margin - (-pin[0] if home else pin[0])
+            same = e_pin * sign >= 0
+            edges += (f" / {edge_note(e_pin)}" if same
+                      else f" / {abs(e_pin):.1f} the other way")
+            if dk:
                 priced += 1
-                pin_spread = -pin[0] if home else pin[0]
-                e_pin = margin - pin_spread
-                same = (e_pin > 0) == (e_dk > 0)
-                edges += (f" / {edge_note(e_pin)}" if same
-                          else f" / {abs(e_pin):.1f} the other way")
                 if not same and abs(e_dk) >= 1:
                     notes.append("against Pinnacle the model's side flips")
                 elif abs(e_pin) < 1 <= abs(e_dk):
