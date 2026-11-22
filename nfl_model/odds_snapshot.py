@@ -119,13 +119,13 @@ def append(path, snap, taken):
     every reader (pandas, csv.DictReader) sees one consistent table.
     """
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    old = []
-    if os.path.exists(path):
+    old, rewrite = [], not os.path.exists(path)
+    if not rewrite:
         with open(path, newline="") as fh:
             rd = csv.DictReader(fh)
-            if rd.fieldnames and rd.fieldnames != FIELDS:
-                old = list(rd)
-    if old or not os.path.exists(path):
+            if rd.fieldnames != FIELDS:
+                old, rewrite = list(rd), True
+    if rewrite:
         with open(path, "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
             w.writeheader()
