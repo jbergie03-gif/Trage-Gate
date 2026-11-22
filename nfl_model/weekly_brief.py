@@ -14,7 +14,9 @@ memory.
 
 Output: ~/fgdata/brief/<season>-w<week>.md (or --out). Nothing here is a
 recommendation; the labels are the reader's job. The model section carries the
-same coin-flip / error-bar notes as the pick sheet, and the Fantasy Guru
+same coin-flip / error-bar notes as the pick sheet, and the game-day section
+reads ESPN's live depth charts (rerun gameday_check.py on Sunday once the
+inactives are out). The Fantasy Guru
 section is their text, quoted, so it stays marked as a media claim.
 """
 import argparse
@@ -28,6 +30,7 @@ import pandas as pd
 
 import fantasyguru_pull as fg
 import game_model
+import gameday_check
 import input_check
 import picksheet_build
 import weather
@@ -99,6 +102,13 @@ def check_section(season, week):
             input_check.check(season, week, game_model.DATA)
     except Exception as e:  # the brief is still useful without it
         return ["## Input check", f"failed: {e}"]
+
+
+def gameday_section(season, week, roster):
+    try:
+        return gameday_check.check(season, week, roster)
+    except Exception as e:  # noqa: BLE001 - ESPN down should not sink the brief
+        return ["## Game-day check", f"failed: {e!r}"]
 
 
 def latest(sub):
@@ -220,6 +230,7 @@ def main():
     L += model_section(df, season, week) + [""]
     L += weather_section(season, week, log=not a.no_pull) + [""]
     L += check_section(season, week) + [""]
+    L += gameday_section(season, week, a.roster) + [""]
     L += rankings_section(roster_names(a.roster)) + [""]
     L += smash_section() + [""]
     L += articles_section()
