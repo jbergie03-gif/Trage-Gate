@@ -856,6 +856,39 @@ python3 weather.py --notes --no-log
 python3 weather.py --report
 ```
 
+## 14. `gameday_check.py` — who is actually playing
+
+`input_check.py` compares the model's starters with the injury report. It does
+not know who is playing on game day, because nothing in the repo read a depth
+chart. The biggest misses all season came from backup quarterbacks and
+goal-line backs who were never going to play.
+
+```bash
+python3 gameday_check.py                       # current week, prints Markdown
+python3 gameday_check.py --season 2026 --week 11 --out gameday.md
+```
+
+For each game still to be played it reads ESPN's live team depth charts and
+game injury reports and lists:
+
+- **Quarterbacks.** For each team it compares the model's QB (`games.csv`), ESPN's QB1, the
+  latest nflverse depth chart and whoever threw the most passes in the team's
+  last game. A wrong QB gets a ready-to-run `input_check.py --swap` command
+  and its what-if margin. A Questionable/Doubtful QB1 gets the same
+  command for the next healthy QB, in case he sits.
+- **Tagged starters.** Any RB/WR/TE/K starter with an injury tag, and the next healthy
+  player on the chart.
+- **The fantasy roster.** Every player's ESPN team, chart spot, tag and kickoff.
+- **Inactives timing.** Teams post inactives about 90 minutes before kickoff. The report
+  says, for each game, whether this run came after that time. A run made
+  before it is a forecast, so rerun it on Sunday morning.
+
+`weekly_brief.py` includes this section, and an ESPN outage prints a one-line
+failure instead of stopping the brief. Like `input_check.py`, it
+**never edits a pick**. Its tags are injury designations, not the official
+inactive list, so it misses healthy scratches; it also cannot see a player who
+is active but limited.
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player

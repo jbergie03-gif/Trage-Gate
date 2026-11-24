@@ -17,6 +17,9 @@ for year in 2025 2026; do
   curl -fsSL -o "$DIR/spw_$year.csv" "$BASE/stats_player/stats_player_week_$year.csv"
 done
 
+# depth charts, one timestamped snapshot a day; gameday_check.py reads the latest
+curl -fsSL -o "$DIR/depth_charts_2026.csv" "$BASE/depth_charts/depth_charts_2026.csv"
+
 # play-by-play (red-zone targets, goal-line carries), snap counts, injury reports
 for year in $(seq 2016 2026); do
   curl -fsSL -o "$DIR/pbp_$year.csv.gz" "$BASE/pbp/play_by_play_$year.csv.gz" &
