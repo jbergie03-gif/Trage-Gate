@@ -856,6 +856,27 @@ python3 weather.py --notes --no-log
 python3 weather.py --report
 ```
 
+### `line_shop.py` — the best number, with Pinnacle as the check
+
+The model does not beat the closing line, so the edge that does not need it
+to is a better price. `odds_snapshot.py` pulls DraftKings, FanDuel, BetMGM,
+BetRivers, theScore Bet, Hard Rock Bet and Pinnacle in one request: up to 10
+named books count as one region, so it still costs 2 credits (Caesars and
+Fanatics are paid-plan only). It now keeps each side's price as well as the
+number. `line_shop.py` reads the latest snapshot (no credits) and, for the
+model's side of every game, shows the DraftKings number, the best number at a
+US book with its price, Pinnacle's number, the model's edge against both, and
+whether the better number crosses 3 or 7 (14.8% and 8.7% of 2015–2025 games
+ended by exactly those margins). Pinnacle is the sharpest line, so a DK number
+far from it is flagged and an edge that is a coin flip against Pinnacle should
+be treated as one. The Saturday brief carries this as its "Line shopping"
+section.
+
+```bash
+python3 line_shop.py                               # next slate, latest snapshot
+python3 line_shop.py --season 2026 --week 12 --odds data/odds_snapshots.csv
+```
+
 ## Data sources
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
@@ -868,6 +889,8 @@ python3 weather.py --report
   — public ticket percentages and per-book timestamped line history, served as
   JSON in the page payload. Percentages exist from 2021 on, patchily in 2023;
   line history reaches back to 2019.
+- [The Odds API](https://the-odds-api.com/) (free plan, 500 credits a month) —
+  spreads and totals with prices across US books plus Pinnacle.
 - Kalshi public trade API — live books.
 - [Open-Meteo](https://open-meteo.com/) — free hourly forecasts at each
   stadium for `weather.py`.

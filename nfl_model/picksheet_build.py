@@ -157,7 +157,11 @@ def apply_swaps(g, season, week, swaps):
     return g
 
 
-def rows(df, season, week, stars=STARS, now=None, facts=None, log=True):
+def rows(df, season, week, stars=STARS, now=None, facts=None, log=True,
+         margins=False):
+    """The slate as the sheet shows it. margins=True also keeps the model's
+    predicted home margin (`modelMargin`) for line_shop; the sheet omits it.
+    """
     lines, stamp = dk_lines()
     df = week_lines(df, season, week, lines)
     slate = smash_feature.apply(game_model.predict_slate(df, season, week))
@@ -214,6 +218,8 @@ def rows(df, season, week, stars=STARS, now=None, facts=None, log=True):
                        else total_model.note(model_total - total)),
             _locked=started,
             _edge=abs(edge),
+            **({"modelMargin": round(float(pred[r.game_id]), 2)}
+               if margins else {}),
         ))
     out.sort(key=lambda g: g["_kick"])
     for g in sorted((g for g in out if not g["_locked"]),

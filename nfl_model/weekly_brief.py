@@ -29,6 +29,7 @@ import pandas as pd
 import fantasyguru_pull as fg
 import game_model
 import input_check
+import line_shop
 import picksheet_build
 import weather
 
@@ -60,8 +61,9 @@ def pulls(season, week):
     return L
 
 
-def model_section(df, season, week):
-    games, stamp = picksheet_build.rows(df, season, week)
+def model_section(df, season, week, games=None, stamp=None):
+    if games is None:
+        games, stamp = picksheet_build.rows(df, season, week)
     L = [f"## Model vs DraftKings ({stamp or 'no DK snapshot'})",
          "", "| Game | Kick | Line | Total | Model pick | Note | Model total | O/U note |",
          "|---|---|---|---|---|---|---|---|"]
@@ -73,6 +75,18 @@ def model_section(df, season, week):
     L += ["", "Spread model is scored flat; totals model has no demonstrated "
           "O/U edge (49% historically) — totals are leans, not plays."]
     return L
+
+
+def shop_section(games, season):
+    """Best number per side across the snapshot's books, Pinnacle as the check."""
+    try:
+        snap, stamp = line_shop.snapshot()
+        shares, span = line_shop.key_share(
+            pd.read_csv(game_model.GAMES, usecols=["season", "result"]),
+            last=season - 1)
+        return line_shop.section(games, snap, stamp, shares, span)
+    except Exception as e:  # noqa: BLE001 - the brief goes out without it
+        return ["## Line shopping", f"- failed: {e!r}"]
 
 
 def weather_section(season, week, log=True):
@@ -217,7 +231,9 @@ def main():
     if not a.no_pull:
         L += pulls(season, week) + [""]
         df = game_model.build(*game_model.load())
-    L += model_section(df, season, week) + [""]
+    games, stamp = picksheet_build.rows(df, season, week, margins=True)
+    L += model_section(df, season, week, games, stamp) + [""]
+    L += shop_section(games, season) + [""]
     L += weather_section(season, week, log=not a.no_pull) + [""]
     L += check_section(season, week) + [""]
     L += rankings_section(roster_names(a.roster)) + [""]
