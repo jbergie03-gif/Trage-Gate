@@ -860,7 +860,7 @@ python3 weather.py --report
 
 - Fantasy Guru subscriber pages (paid, permission on file) — cross-book player
   prop lines, weekly fantasy rankings, and the NFL SMASH line/coverage ratings.
-- [nflverse games.csv](http://www.habitatring.com/games.csv) — results plus
+- [nflverse games.csv](https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv) — results plus
   closing spread/total/moneyline, 1999–present.
 - [nflverse-data releases](https://github.com/nflverse/nflverse-data/releases) —
   play-by-play, rosters, injuries, weekly player stats, through 2026.
