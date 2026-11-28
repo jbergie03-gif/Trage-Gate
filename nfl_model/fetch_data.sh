@@ -6,7 +6,11 @@ DIR="${1:-/home/ubuntu/nflmodel/data}"
 mkdir -p "$DIR"
 BASE=https://github.com/nflverse/nflverse-data/releases/download
 
-curl -fsSL -o "$DIR/games.csv" http://www.habitatring.com/games.csv
+# schedules + scores: nflverse's release asset (what nflreadr reads), falling
+# back to the nfldata repo copy; habitatring.com/games.csv went 404 in 2026
+curl -fsSL -o "$DIR/games.csv" "$BASE/schedules/games.csv" \
+  || curl -fsSL -o "$DIR/games.csv" \
+    https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv
 
 # player id crosswalk: the injury feed keys on gsis_id, snap counts on pfr_id
 curl -fsSL -o "$DIR/players.csv" "$BASE/players/players.csv"
